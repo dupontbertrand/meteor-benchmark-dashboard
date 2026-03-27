@@ -1,0 +1,171 @@
+<template name="about">
+  <h2>About this benchmark</h2>
+  <p class="lead text-muted">How we measure Meteor performance, and what the numbers mean.</p>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>How it works</strong></div>
+    <div class="card-body">
+      <p>Each benchmark run follows the same steps:</p>
+      <ol>
+        <li><strong>Start a Meteor app</strong> from a specific Git branch (e.g. <code>devel</code>, <code>release-3.5</code>), with GC monitoring injected into the Node.js process.</li>
+        <li><strong>Generate load</strong> using <a href="https://www.artillery.io/" target="_blank">Artillery</a>, an open-source load testing tool. Artillery spawns virtual users that hit the app concurrently — either through real Chromium browsers (Playwright) or raw DDP/WebSocket connections.</li>
+        <li><strong>Collect metrics</strong> while the test runs: CPU, RAM, and garbage collection data from the Meteor server process.</li>
+        <li><strong>Push results</strong> to this dashboard via DDP, where they can be compared and visualized.</li>
+      </ol>
+      <p class="mb-0">The whole pipeline is automated via <strong>GitHub Actions</strong> — benchmarks run on every PR and nightly on <code>devel</code>.</p>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>Scenario types</strong></div>
+    <div class="card-body">
+      <h6>Browser scenarios (Artillery + Playwright)</h6>
+      <p>
+        Artillery launches real Chromium instances. Each virtual user opens the app, interacts with the UI (click buttons, fill forms),
+        and receives live reactive updates via DDP. This is the closest to what a real user experiences — it tests the full stack:
+        DDP transport, pub/sub reactivity, MongoDB writes, oplog tailing, and client-side rendering.
+      </p>
+      <p>Downside: Chromium is resource-hungry. You can't run more than ~240 browser VUs on a standard CI runner without starving the Meteor server itself.</p>
+
+      <h6>DDP-raw scenarios (Artillery + SimpleDDP)</h6>
+      <p>
+        Instead of browsers, Artillery uses <a href="https://github.com/Gregivy/simpleddp" target="_blank">SimpleDDP</a> — a lightweight
+        DDP client over raw WebSocket (<code>ws</code> library). Each virtual user connects, subscribes to publications,
+        and calls Meteor methods programmatically. No DOM, no rendering, no Chromium.
+      </p>
+      <p>This isolates <strong>pure server performance</strong>: method dispatch, publication reactivity, DDP serialization, and MongoDB throughput.
+        It scales to many more concurrent connections and runs much faster than browser scenarios.</p>
+
+      <h6>CLI scenarios (planned)</h6>
+      <p>For metrics that don't need load testing: cold start time (<code>meteor reset</code> → app running),
+        hot reload speed (file change → rebuild), and bundle size (<code>meteor build</code> output).</p>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>Metrics collected</strong></div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead class="table-dark">
+          <tr><th>Metric</th><th>Source</th><th>What it tells you</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Wall Clock</strong></td>
+            <td>Timer</td>
+            <td>Total benchmark duration. Sensitive to runner load — use for relative comparisons only.</td>
+          </tr>
+          <tr>
+            <td><strong>APP CPU avg/max</strong></td>
+            <td><code>pidusage</code> (1s intervals)</td>
+            <td>How hard the Meteor process is working. Values above 100% mean multi-core usage.</td>
+          </tr>
+          <tr>
+            <td><strong>APP RAM avg/max</strong></td>
+            <td><code>pidusage</code> (RSS)</td>
+            <td>Memory footprint of the Meteor process. Steady growth may indicate a leak.</td>
+          </tr>
+          <tr>
+            <td><strong>DB CPU/RAM</strong></td>
+            <td><code>pidusage</code></td>
+            <td>MongoDB resource usage. High DB CPU often means unindexed queries or write-heavy workloads.</td>
+          </tr>
+          <tr>
+            <td><strong>GC total pause</strong></td>
+            <td>Node.js <code>PerformanceObserver</code></td>
+            <td>Total time V8 spent on garbage collection instead of running your code. Reliable across runners.</td>
+          </tr>
+          <tr>
+            <td><strong>GC max pause</strong></td>
+            <td>Node.js <code>PerformanceObserver</code></td>
+            <td>Longest single GC freeze. Above 50ms = noticeable latency spike for clients.</td>
+          </tr>
+          <tr>
+            <td><strong>GC count</strong></td>
+            <td>Node.js <code>PerformanceObserver</code></td>
+            <td>Number of GC events. More = more temporary objects allocated and discarded.</td>
+          </tr>
+          <tr>
+            <td><strong>GC minor (scavenge)</strong></td>
+            <td>Node.js <code>PerformanceObserver</code></td>
+            <td>Fast collections of short-lived objects in the "new space". Cheap and frequent.</td>
+          </tr>
+          <tr>
+            <td><strong>GC major (mark-sweep)</strong></td>
+            <td>Node.js <code>PerformanceObserver</code></td>
+            <td>Full heap collection. Expensive — causes the longest pauses. Triggered when the heap is under pressure.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>Interpreting results</strong></div>
+    <div class="card-body">
+      <h6>Noise on shared runners</h6>
+      <p>
+        Benchmarks currently run on <strong>shared GitHub Actions runners</strong>. These machines are shared with other users,
+        so CPU-bound metrics (wall clock, CPU avg) can vary by ~30% between runs. GC metrics are more stable because they measure
+        time spent inside V8, which is less affected by external CPU contention.
+      </p>
+
+      <h6>What to trust</h6>
+      <ul>
+        <li><strong>GC total pause, GC count, GC major</strong> — most reliable. If these are consistently higher on one branch, it's a real signal.</li>
+        <li><strong>RAM avg</strong> — fairly stable. Memory allocation patterns don't change much with runner load.</li>
+        <li><strong>CPU avg, Wall clock</strong> — treat as directional. A 5% difference is noise; a 40% difference is real.</li>
+      </ul>
+
+      <h6>Regression detection</h6>
+      <p>The <code>bench.js compare</code> command flags regressions using configurable thresholds:</p>
+      <ul>
+        <li><span class="badge bg-warning text-dark">WARN</span> — metric increased by 10-25% (depending on metric type)</li>
+        <li><span class="badge bg-danger">FAIL</span> — metric increased by 25-60% (depending on metric type)</li>
+        <li><span class="badge bg-success">OK</span> — metric improved or within normal variance</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>Architecture</strong></div>
+    <div class="card-body">
+      <pre class="mb-0" style="font-size: 0.85rem;">
+┌──────────────────────────────────────────────────────────┐
+│                    GitHub Actions CI                       │
+│                                                           │
+│  1. Clone meteor/meteor at branch X                       │
+│  2. Start Meteor app + GC monitor                         │
+│  3. Run Artillery (Playwright or DDP-raw)                 │
+│  4. Collect CPU/RAM/GC metrics                            │
+│  5. Compare baseline vs target                            │
+│  6. Push results via DDP ──────────────────┐              │
+│                                            │              │
+└────────────────────────────────────────────│──────────────┘
+                                             │
+                                             ▼
+                                   ┌──────────────────┐
+                                   │  This Dashboard   │
+                                   │  (Blaze + Galaxy)  │
+                                   │                    │
+                                   │  • Recent runs     │
+                                   │  • Compare view    │
+                                   │  • Trend charts    │
+                                   │  • Scenario info   │
+                                   └──────────────────┘</pre>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><strong>Links</strong></div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li><a href="https://github.com/dupontbertrand/performance/tree/feature/benchmark-framework" target="_blank">Benchmark framework source</a></li>
+        <li><a href="https://github.com/dupontbertrand/meteor-benchmark-dashboard" target="_blank">Dashboard source</a></li>
+        <li><a href="https://www.artillery.io/docs" target="_blank">Artillery documentation</a></li>
+        <li><a href="https://github.com/nicolo-ribaudo/tc39-proposal-perf-observer" target="_blank">Node.js PerformanceObserver API</a></li>
+        <li><a href="https://forums.meteor.com/t/meteor-performance-a-todo-list/64266" target="_blank">Meteor forum: Performance TODO list</a></li>
+      </ul>
+    </div>
+  </div>
+</template>

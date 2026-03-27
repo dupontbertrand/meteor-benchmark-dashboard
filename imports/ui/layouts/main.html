@@ -6,10 +6,14 @@
         <a class="nav-link {{activeIf 'dashboard'}}" href="/">Dashboard</a>
         <a class="nav-link {{activeIf 'compare'}}" href="/compare">Compare</a>
         <a class="nav-link {{activeIf 'trends'}}" href="/trends">Trends</a>
+        <a class="nav-link {{activeIf 'about'}}" href="/about">About</a>
       </div>
     </div>
   </nav>
   <div class="container">
     {{> Template.dynamic template=content}}
   </div>
+  <footer class="text-center text-muted py-4" style="font-size: 0.75rem;">
+    Made with ❤️ by <a href="https://github.com/dupontbertrand">dupontbertrand</a> for <a href="https://www.meteor.com/">MeteorJS</a> ☄️
+  </footer>
 </template>

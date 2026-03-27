@@ -9,6 +9,7 @@ import '../imports/ui/pages/compare.js';
 import '../imports/ui/pages/trends.js';
 import '../imports/ui/pages/detail.js';
 import '../imports/ui/pages/scenario.js';
+import '../imports/ui/pages/about.js';
 
 // Routes
 FlowRouter.route('/', {
@@ -36,6 +37,13 @@ FlowRouter.route('/run/:id', {
   name: 'detail',
   action() {
     this.render('mainLayout', { content: 'detail' });
+  },
+});
+
+FlowRouter.route('/about', {
+  name: 'about',
+  action() {
+    this.render('mainLayout', { content: 'about' });
   },
 });
 
