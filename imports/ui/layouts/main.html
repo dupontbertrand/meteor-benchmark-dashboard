@@ -1,0 +1,15 @@
+<template name="mainLayout">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="/">Meteor Benchmark</a>
+      <div class="navbar-nav">
+        <a class="nav-link {{activeIf 'dashboard'}}" href="/">Dashboard</a>
+        <a class="nav-link {{activeIf 'compare'}}" href="/compare">Compare</a>
+        <a class="nav-link {{activeIf 'trends'}}" href="/trends">Trends</a>
+      </div>
+    </div>
+  </nav>
+  <div class="container">
+    {{> Template.dynamic template=content}}
+  </div>
+</template>

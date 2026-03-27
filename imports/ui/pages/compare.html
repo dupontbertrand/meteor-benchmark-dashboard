@@ -1,0 +1,64 @@
+<template name="compare">
+  <h2>Compare Runs</h2>
+
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <label class="form-label">Baseline (Branch A)</label>
+      <select class="form-select" id="tagA">
+        <option value="">Select tag...</option>
+        {{#each tags}}
+          <option value="{{this}}">{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Target (Branch B)</label>
+      <select class="form-select" id="tagB">
+        <option value="">Select tag...</option>
+        {{#each tags}}
+          <option value="{{this}}">{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Scenario</label>
+      <select class="form-select" id="scenarioFilter">
+        <option value="">All scenarios</option>
+        {{#each scenarios}}
+          <option value="{{this}}">{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+  </div>
+
+  {{#if showComparison}}
+    {{#if baselineRun}}
+      <div class="table-responsive">
+        <table class="table table-bordered">
+          <thead class="table-dark">
+            <tr>
+              <th>Metric</th>
+              <th>{{selectedTagA}} (baseline)</th>
+              <th>{{selectedTagB}} (target)</th>
+              <th>Delta</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each comparisonRows}}
+              <tr>
+                <td>{{label}}</td>
+                <td>{{baselineVal}}</td>
+                <td>{{targetVal}}</td>
+                <td class="{{deltaClass}}">{{{deltaStr}}}</td>
+                <td>{{{statusIcon}}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </div>
+    {{else}}
+      <div class="alert alert-warning">No matching runs found for these tags.</div>
+    {{/if}}
+  {{/if}}
+</template>
