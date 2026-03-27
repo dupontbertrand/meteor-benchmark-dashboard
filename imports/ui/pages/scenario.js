@@ -99,9 +99,10 @@ const SCENARIOS = {
       'Measures how long it takes the Meteor app to start from a clean state (after meteor reset). ' +
       'Includes build time, module loading, and initial MongoDB connection.',
     technical:
-      'Runs <code>meteor reset</code> followed by <code>meteor run</code> and measures time until ' +
-      'the app responds to HTTP requests on port 3000. Includes full isobuild compilation, ' +
-      'npm module resolution, server startup, and MongoDB connection. Not yet implemented.',
+      'Runs <code>meteor reset</code> then <code>meteor run</code> 3 times. Measures time from process start ' +
+      'until the app responds to HTTP on port 3000. Includes isobuild compilation, npm module resolution, ' +
+      'server startup, and MongoDB connection. Reports median/min/max of the 3 runs to reduce variance. ' +
+      'No Artillery or load generation — purely measures the framework boot overhead.',
   },
   'hot-reload': {
     name: 'hot-reload',
@@ -126,8 +127,9 @@ const SCENARIOS = {
       'Measures the output size of client and server bundles after meteor build. ' +
       'Tracks bundle bloat across versions.',
     technical:
-      'Runs <code>meteor build</code> and measures the size of the resulting client JS bundle ' +
-      'and server bundle. Helps detect dependency bloat or build regressions. Not yet implemented.',
+      'Runs <code>meteor build --directory</code> and measures: client JS bundle size (minified), ' +
+      'server bundle size, total bundle size, and build time. 100% deterministic — no variance from runner load. ' +
+      'Detects dependency bloat, minifier regressions, and build performance changes across Meteor versions.',
   },
 };
 
