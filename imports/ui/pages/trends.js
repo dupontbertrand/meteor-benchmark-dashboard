@@ -46,17 +46,18 @@ Template.trends.onRendered(function () {
     const extractor = METRIC_EXTRACTORS[metric];
     if (!extractor || runs.length === 0) return;
 
-    // Group by tag for multi-line chart
+    // Group by tag for multi-line chart, using run index (not timestamp) for X axis
     const byTag = {};
-    for (const run of runs) {
+    for (let i = 0; i < runs.length; i++) {
+      const run = runs[i];
       if (!byTag[run.tag]) byTag[run.tag] = [];
       const val = extractor(run);
       if (val != null) {
-        byTag[run.tag].push({ x: new Date(run.timestamp), y: val });
+        byTag[run.tag].push({ x: i, y: val, timestamp: run.timestamp });
       }
     }
 
-    const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#6610f2', '#fd7e14'];
+    const colors = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#6610f2', '#fd7e14', '#20c997', '#e83e8c'];
     const datasets = Object.entries(byTag).map(([tag, points], i) => ({
       label: tag,
       data: points,
@@ -76,11 +77,30 @@ Template.trends.onRendered(function () {
       options: {
         responsive: true,
         scales: {
-          x: { type: 'time', time: { unit: 'day' } },
+          x: {
+            type: 'linear',
+            display: true,
+            title: { display: true, text: 'Run #' },
+            ticks: { stepSize: 1, callback: (v) => `#${v + 1}` },
+          },
           y: { beginAtZero: true },
         },
         plugins: {
           legend: { position: 'top' },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const pt = items[0]?.raw;
+                if (pt?.timestamp) {
+                  return new Date(pt.timestamp).toLocaleString('en-GB', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  });
+                }
+                return '';
+              },
+            },
+          },
         },
       },
     });
