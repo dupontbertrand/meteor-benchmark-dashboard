@@ -64,6 +64,11 @@ function verdictHtml(bRun, tRun) {
   check('CPU', bRun.metrics?.app_resources?.cpu?.avg, tRun.metrics?.app_resources?.cpu?.avg, 10);
   check('RAM', bRun.metrics?.app_resources?.memory?.avg_mb, tRun.metrics?.app_resources?.memory?.avg_mb, 10);
 
+  // Fallback to wall clock for scenarios without app metrics (cold-start, bundle-size, hot-reload)
+  if (parts.length === 0 && bRun.wall_clock_ms && tRun.wall_clock_ms) {
+    check('Time', bRun.wall_clock_ms, tRun.wall_clock_ms, 5);
+  }
+
   if (parts.length === 0) return '<span class="badge bg-success">OK</span>';
   return `<div style="font-size: 0.8rem; line-height: 1.4">${parts.join('<br>')}</div>`;
 }
