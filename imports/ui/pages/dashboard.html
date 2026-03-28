@@ -13,7 +13,7 @@
         <div class="text-muted">reference</div>
         <select class="form-select form-select-sm" id="healthBaseline" style="width: auto;">
           {{#each tags}}
-            <option value="{{this}}" selected="{{isBaseline this}}">{{this}}</option>
+            <option value="{{this}}" selected={{isBaseline this}}>{{this}}</option>
           {{/each}}
         </select>
       </div>
@@ -22,7 +22,7 @@
         <div class="text-muted">testing</div>
         <select class="form-select form-select-sm" id="healthTarget" style="width: auto;">
           {{#each tags}}
-            <option value="{{this}}" selected="{{isTarget this}}">{{this}}</option>
+            <option value="{{this}}" selected={{isTarget this}}>{{this}}</option>
           {{/each}}
         </select>
       </div>

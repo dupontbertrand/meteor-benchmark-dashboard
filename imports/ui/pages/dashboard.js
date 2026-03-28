@@ -82,8 +82,8 @@ Template.dashboard.helpers({
   tags() { return Template.instance().tags.get(); },
   baselineTag() { return Template.instance().baselineTag.get(); },
   targetTag() { return Template.instance().targetTag.get(); },
-  isBaseline(tag) { return tag === Template.instance().baselineTag.get(); },
-  isTarget(tag) { return tag === Template.instance().targetTag.get(); },
+  isBaseline(tag) { return tag === Template.instance().baselineTag.get() ? 'selected' : null; },
+  isTarget(tag) { return tag === Template.instance().targetTag.get() ? 'selected' : null; },
 
   // ─── Section 1: Release diagnosis ─────────────────────────────
   diagnosis() {
