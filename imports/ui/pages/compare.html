@@ -47,7 +47,7 @@
           <tbody>
             {{#each comparisonRows}}
               <tr>
-                <td>{{label}}</td>
+                <td title="{{tooltip}}" style="cursor: help; border-bottom: 1px dotted #999;">{{label}}</td>
                 <td>{{baselineVal}}</td>
                 <td>{{targetVal}}</td>
                 <td class="{{deltaClass}}">{{{deltaStr}}}</td>

@@ -45,6 +45,18 @@ Template.compare.helpers({
     const target = Runs.findOne({ tag: tagB }, { sort: { timestamp: -1 } });
     if (!baseline || !target) return [];
 
+    const tooltips = {
+      'Wall clock': 'Total benchmark duration. Sensitive to runner load — use for relative comparisons only.',
+      'APP CPU avg': 'Average CPU usage of the Meteor Node.js process. Values above 100% mean multi-core usage. Higher = server working harder.',
+      'APP RAM avg': 'Average resident memory (RSS) of the Meteor process. Steady growth across runs may indicate a memory leak.',
+      'DB CPU avg': 'Average CPU usage of the MongoDB process. High values suggest unindexed queries or write-heavy workloads.',
+      'DB RAM avg': 'Average resident memory of the MongoDB process. Includes WiredTiger cache and connection buffers.',
+      'GC total pause': 'Total time V8 spent on garbage collection instead of running code. Most reliable metric on shared runners.',
+      'GC max pause': 'Longest single GC freeze. Above 50ms = noticeable latency spike for connected clients.',
+      'GC count': 'Number of GC events (minor + major). More = more temporary objects allocated and discarded.',
+      'GC major': 'Time spent in full heap (mark-sweep-compact) collections. The most expensive GC type — causes the longest pauses.',
+    };
+
     const rows = [];
     const addRow = (label, baseVal, targetVal, unit) => {
       if (baseVal == null || targetVal == null || baseVal === 0) return;
@@ -53,6 +65,7 @@ Template.compare.helpers({
       const isWorse = delta > 0;
       rows.push({
         label,
+        tooltip: tooltips[label] || '',
         baselineVal: `${baseVal.toFixed?.(1) ?? baseVal}${unit}`,
         targetVal: `${targetVal.toFixed?.(1) ?? targetVal}${unit}`,
         deltaStr: `${delta > 0 ? '+' : ''}${deltaFixed}%`,
