@@ -12,7 +12,7 @@
         <li><strong>Collect metrics</strong> while the test runs: CPU, RAM, and garbage collection data from the Meteor server process.</li>
         <li><strong>Push results</strong> to this dashboard via DDP, where they can be compared and visualized.</li>
       </ol>
-      <p class="mb-0">The whole pipeline is automated via <strong>GitHub Actions</strong> — benchmarks run on every PR and nightly on <code>devel</code>.</p>
+      <p class="mb-0">The whole pipeline is automated via <strong>GitHub Actions</strong> — benchmarks run nightly on <code>devel</code>, on demand for PRs, and with transport comparison (uws vs sockjs).</p>
     </div>
   </div>
 
@@ -36,9 +36,10 @@
       <p>This isolates <strong>pure server performance</strong>: method dispatch, publication reactivity, DDP serialization, and MongoDB throughput.
         It scales to many more concurrent connections and runs much faster than browser scenarios.</p>
 
-      <h6>CLI scenarios (planned)</h6>
+      <h6>CLI scenarios</h6>
       <p>For metrics that don't need load testing: cold start time (<code>meteor reset</code> → app running),
-        hot reload speed (file change → rebuild), and bundle size (<code>meteor build</code> output).</p>
+        hot reload speed (file change → rebuild), and bundle size (<code>meteor build</code> output).
+        These run without Artillery — they measure the Meteor CLI and build system directly.</p>
     </div>
   </div>
 
@@ -148,10 +149,10 @@
                                    │  This Dashboard   │
                                    │  (Blaze + Galaxy)  │
                                    │                    │
-                                   │  • Recent runs     │
+                                   │  • Branch health   │
                                    │  • Compare view    │
                                    │  • Trend charts    │
-                                   │  • Scenario info   │
+                                   │  • Run details     │
                                    └──────────────────┘</pre>
     </div>
   </div>
@@ -160,7 +161,7 @@
     <div class="card-header"><strong>Links</strong></div>
     <div class="card-body">
       <ul class="mb-0">
-        <li><a href="https://github.com/dupontbertrand/performance/tree/feature/benchmark-framework" target="_blank">Benchmark framework source</a></li>
+        <li><a href="https://github.com/dupontbertrand/performance" target="_blank">Benchmark framework source</a></li>
         <li><a href="https://github.com/dupontbertrand/meteor-benchmark-dashboard" target="_blank">Dashboard source</a></li>
         <li><a href="https://www.artillery.io/docs" target="_blank">Artillery documentation</a></li>
         <li><a href="https://github.com/nicolo-ribaudo/tc39-proposal-perf-observer" target="_blank">Node.js PerformanceObserver API</a></li>
