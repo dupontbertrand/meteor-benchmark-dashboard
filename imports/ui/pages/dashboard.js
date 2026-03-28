@@ -13,8 +13,13 @@ Template.dashboard.onCreated(function () {
 
   Meteor.callAsync('runs.distinctTags').then((tags) => {
     this.tags.set(tags);
-    // Auto-select: latest release as baseline, devel as target
-    const releases = tags.filter(t => t.startsWith('release-'));
+    // Auto-select: latest release-3.x as baseline, devel as target
+    const releases = tags.filter(t => /^release-3\.\d+$/.test(t));
+    releases.sort((a, b) => {
+      const numA = parseFloat(a.replace('release-', ''));
+      const numB = parseFloat(b.replace('release-', ''));
+      return numB - numA;
+    });
     if (releases.length > 0) this.baselineTag.set(releases[0]);
     if (tags.includes('devel')) this.targetTag.set('devel');
   });
@@ -203,6 +208,7 @@ Template.dashboard.helpers({
       return {
         ...family,
         scenarioCount: family.scenarios.length,
+        isSingle: family.scenarios.length === 1,
         rows,
       };
     });
