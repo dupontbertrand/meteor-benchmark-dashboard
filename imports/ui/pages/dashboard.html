@@ -5,21 +5,27 @@
     <div>
       <h2 class="mb-0">Release Health</h2>
       <small class="text-muted">
-        Comparing <strong>{{targetTag}}</strong> against <strong>{{baselineTag}}</strong>
+        How does <strong>{{targetTag}}</strong> perform compared to <strong>{{baselineTag}}</strong>?
       </small>
     </div>
     <div class="d-flex gap-2 align-items-center">
-      <select class="form-select form-select-sm" id="healthBaseline" style="width: auto;">
-        {{#each tags}}
-          <option value="{{this}}" selected="{{isBaseline this}}">{{this}}</option>
-        {{/each}}
-      </select>
-      <button class="btn btn-sm btn-outline-secondary" id="swapTags" title="Swap baseline and target">⇄</button>
-      <select class="form-select form-select-sm" id="healthTarget" style="width: auto;">
-        {{#each tags}}
-          <option value="{{this}}" selected="{{isTarget this}}">{{this}}</option>
-        {{/each}}
-      </select>
+      <div class="text-end" style="font-size: 0.75rem">
+        <div class="text-muted">reference</div>
+        <select class="form-select form-select-sm" id="healthBaseline" style="width: auto;">
+          {{#each tags}}
+            <option value="{{this}}" selected="{{isBaseline this}}">{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" id="swapTags" title="Swap">⇄</button>
+      <div style="font-size: 0.75rem">
+        <div class="text-muted">testing</div>
+        <select class="form-select form-select-sm" id="healthTarget" style="width: auto;">
+          {{#each tags}}
+            <option value="{{this}}" selected="{{isTarget this}}">{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
     </div>
   </div>
 
@@ -39,8 +45,8 @@
             {{#if topImprovement}}
             <div class="col-md-6">
               <div class="small">
-                <span class="text-success fw-bold">Biggest improvement</span>
-                <div>{{topImprovement.label}} — {{topImprovement.metric}} <strong>{{topImprovement.deltaStr}}</strong></div>
+                <span class="text-success fw-bold">Biggest improvement in {{targetTag}}</span>
+                <div>{{topImprovement.label}} — {{topImprovement.metric}} <strong>{{topImprovement.deltaStr}}</strong> vs {{baselineTag}}</div>
                 <div class="text-muted" style="font-size: 0.75rem">{{topImprovement.interpret}}</div>
               </div>
             </div>
@@ -48,8 +54,8 @@
             {{#if topRegression}}
             <div class="col-md-6">
               <div class="small">
-                <span class="text-danger fw-bold">Biggest regression</span>
-                <div>{{topRegression.label}} — {{topRegression.metric}} <strong>{{topRegression.deltaStr}}</strong></div>
+                <span class="text-danger fw-bold">Biggest regression in {{targetTag}}</span>
+                <div>{{topRegression.label}} — {{topRegression.metric}} <strong>{{topRegression.deltaStr}}</strong> vs {{baselineTag}}</div>
                 <div class="text-muted" style="font-size: 0.75rem">{{topRegression.interpret}}</div>
               </div>
             </div>

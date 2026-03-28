@@ -96,17 +96,17 @@ Template.dashboard.helpers({
       badgeClass = 'danger';
       borderClass = 'danger';
       const areas = [...new Set(regressions.filter(d => d.delta > 25).map(d => d.familyLabel))].join(', ');
-      summary = `Significant regressions detected in: ${areas}`;
+      summary = `${target} has significant regressions vs ${baseline} in: ${areas}`;
     } else if (hasWarning) {
       verdict = 'Watch';
       badgeClass = 'warning';
       borderClass = 'warning';
-      summary = `Minor regressions detected — monitor before release`;
+      summary = `${target} has minor regressions vs ${baseline} — monitor before release`;
     } else if (improvements.length > 0) {
       verdict = 'Healthy';
       badgeClass = 'success';
       borderClass = 'success';
-      summary = `${target} shows improvements over ${baseline}`;
+      summary = `${target} improves over ${baseline}`;
     } else {
       verdict = 'Healthy';
       badgeClass = 'success';
