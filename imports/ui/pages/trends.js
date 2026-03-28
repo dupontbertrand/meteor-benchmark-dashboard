@@ -1,10 +1,16 @@
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Meteor } from 'meteor/meteor';
+import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Chart } from 'chart.js/auto';
 import 'chartjs-adapter-date-fns';
 import { Runs } from '../../api/runs';
 import './trends.html';
+
+function syncToUrl(key, value) {
+  const current = FlowRouter.getQueryParam(key);
+  if (current !== value) FlowRouter.setQueryParams({ [key]: value || null });
+}
 
 const METRIC_EXTRACTORS = {
   wall_clock: (r) => r.wall_clock_ms / 1000,
@@ -71,22 +77,26 @@ function formatShortDate(date) {
 Template.trends.onCreated(function () {
   this.scenarios = new ReactiveVar([]);
   this.tags = new ReactiveVar([]);
-  this.selectedScenario = new ReactiveVar('');
-  this.selectedMetric = new ReactiveVar('gc_total');
-  this.selectedTag = new ReactiveVar('');
-  this.compareTag = new ReactiveVar('');
-  this.selectedRange = new ReactiveVar('25');
+  this.selectedScenario = new ReactiveVar(FlowRouter.getQueryParam('scenario') || '');
+  this.selectedMetric = new ReactiveVar(FlowRouter.getQueryParam('metric') || 'gc_total');
+  this.selectedTag = new ReactiveVar(FlowRouter.getQueryParam('tag') || '');
+  this.compareTag = new ReactiveVar(FlowRouter.getQueryParam('compare') || '');
+  this.selectedRange = new ReactiveVar(FlowRouter.getQueryParam('range') || '25');
   this.chart = null;
 
   Meteor.callAsync('runs.distinctScenarios').then((s) => {
     this.scenarios.set(s);
-    if (s.includes('ddp-reactive-light')) this.selectedScenario.set('ddp-reactive-light');
-    else if (s.length > 0) this.selectedScenario.set(s[0]);
+    if (!this.selectedScenario.get()) {
+      if (s.includes('ddp-reactive-light')) this.selectedScenario.set('ddp-reactive-light');
+      else if (s.length > 0) this.selectedScenario.set(s[0]);
+    }
   });
   Meteor.callAsync('runs.distinctTags').then((t) => {
     this.tags.set(t);
-    if (t.includes('devel')) this.selectedTag.set('devel');
-    else if (t.length > 0) this.selectedTag.set(t[0]);
+    if (!this.selectedTag.get()) {
+      if (t.includes('devel')) this.selectedTag.set('devel');
+      else if (t.length > 0) this.selectedTag.set(t[0]);
+    }
   });
 
   this.subscribe('runs.recent', 200);
@@ -265,9 +275,9 @@ Template.trends.helpers({
 // ─── Events ─────────────────────────────────────────────────────────
 
 Template.trends.events({
-  'change #trendScenario'(e, i) { i.selectedScenario.set(e.target.value); },
-  'change #trendMetric'(e, i) { i.selectedMetric.set(e.target.value); },
-  'change #trendTag'(e, i) { i.selectedTag.set(e.target.value); },
-  'change #trendCompareTag'(e, i) { i.compareTag.set(e.target.value); },
-  'change #trendRange'(e, i) { i.selectedRange.set(e.target.value); },
+  'change #trendScenario'(e, i) { i.selectedScenario.set(e.target.value); syncToUrl('scenario', e.target.value); },
+  'change #trendMetric'(e, i) { i.selectedMetric.set(e.target.value); syncToUrl('metric', e.target.value); },
+  'change #trendTag'(e, i) { i.selectedTag.set(e.target.value); syncToUrl('tag', e.target.value); },
+  'change #trendCompareTag'(e, i) { i.compareTag.set(e.target.value); syncToUrl('compare', e.target.value); },
+  'change #trendRange'(e, i) { i.selectedRange.set(e.target.value); syncToUrl('range', e.target.value); },
 });

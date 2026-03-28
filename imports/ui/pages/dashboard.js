@@ -1,22 +1,33 @@
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Meteor } from 'meteor/meteor';
+import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Runs } from '../../api/runs';
 import { SCENARIO_META, FAMILIES, FINGERPRINT_AXES, groupByFamily, computeAllDeltas } from '../lib/scenario-meta';
 import './dashboard.html';
 
+function syncToUrl(key, value) {
+  const current = FlowRouter.getQueryParam(key);
+  if (current !== value) FlowRouter.setQueryParams({ [key]: value || null });
+}
+
 Template.dashboard.onCreated(function () {
   this.subscribe('runs.recent', 200);
   this.tags = new ReactiveVar([]);
-  this.baselineTag = new ReactiveVar('release-3.5');
-  this.targetTag = new ReactiveVar('devel');
+  this.baselineTag = new ReactiveVar(FlowRouter.getQueryParam('ref') || 'release-3.5');
+  this.targetTag = new ReactiveVar(FlowRouter.getQueryParam('test') || 'devel');
 
   Meteor.callAsync('runs.distinctTags').then((tags) => {
     this.tags.set(tags);
-    const releases = tags.filter(t => /^release-3\.\d+$/.test(t));
-    releases.sort((a, b) => parseFloat(b.replace('release-', '')) - parseFloat(a.replace('release-', '')));
-    if (releases.length > 0) this.baselineTag.set(releases[0]);
-    if (tags.includes('devel')) this.targetTag.set('devel');
+    // Only auto-select if no query params
+    if (!FlowRouter.getQueryParam('ref')) {
+      const releases = tags.filter(t => /^release-3\.\d+$/.test(t));
+      releases.sort((a, b) => parseFloat(b.replace('release-', '')) - parseFloat(a.replace('release-', '')));
+      if (releases.length > 0) this.baselineTag.set(releases[0]);
+    }
+    if (!FlowRouter.getQueryParam('test') && tags.includes('devel')) {
+      this.targetTag.set('devel');
+    }
   });
 });
 
@@ -223,12 +234,14 @@ Template.dashboard.helpers({
 });
 
 Template.dashboard.events({
-  'change #healthBaseline'(e, i) { i.baselineTag.set(e.target.value); },
-  'change #healthTarget'(e, i) { i.targetTag.set(e.target.value); },
+  'change #healthBaseline'(e, i) { i.baselineTag.set(e.target.value); syncToUrl('ref', e.target.value); },
+  'change #healthTarget'(e, i) { i.targetTag.set(e.target.value); syncToUrl('test', e.target.value); },
   'click #swapTags'(e, i) {
     const a = i.baselineTag.get();
     const b = i.targetTag.get();
     i.baselineTag.set(b);
     i.targetTag.set(a);
+    syncToUrl('ref', b);
+    syncToUrl('test', a);
   },
 });

@@ -1,15 +1,21 @@
 import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Meteor } from 'meteor/meteor';
+import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 import { Runs } from '../../api/runs';
 import './compare.html';
+
+function syncToUrl(key, value) {
+  const current = FlowRouter.getQueryParam(key);
+  if (current !== value) FlowRouter.setQueryParams({ [key]: value || null });
+}
 
 Template.compare.onCreated(function () {
   this.tags = new ReactiveVar([]);
   this.scenarios = new ReactiveVar([]);
-  this.selectedTagA = new ReactiveVar('');
-  this.selectedTagB = new ReactiveVar('');
-  this.selectedScenario = new ReactiveVar('');
+  this.selectedTagA = new ReactiveVar(FlowRouter.getQueryParam('a') || '');
+  this.selectedTagB = new ReactiveVar(FlowRouter.getQueryParam('b') || '');
+  this.selectedScenario = new ReactiveVar(FlowRouter.getQueryParam('scenario') || '');
 
   Meteor.callAsync('runs.distinctTags').then((tags) => this.tags.set(tags));
   Meteor.callAsync('runs.distinctScenarios').then((s) => this.scenarios.set(s));
@@ -118,19 +124,15 @@ Template.compare.helpers({
 });
 
 Template.compare.events({
-  'change #tagA'(event, instance) {
-    instance.selectedTagA.set(event.target.value);
-  },
-  'change #tagB'(event, instance) {
-    instance.selectedTagB.set(event.target.value);
-  },
-  'change #scenarioFilter'(event, instance) {
-    instance.selectedScenario.set(event.target.value);
-  },
-  'click #swapCompare'(event, instance) {
-    const a = instance.selectedTagA.get();
-    const b = instance.selectedTagB.get();
-    instance.selectedTagA.set(b);
-    instance.selectedTagB.set(a);
+  'change #tagA'(e, i) { i.selectedTagA.set(e.target.value); syncToUrl('a', e.target.value); },
+  'change #tagB'(e, i) { i.selectedTagB.set(e.target.value); syncToUrl('b', e.target.value); },
+  'change #scenarioFilter'(e, i) { i.selectedScenario.set(e.target.value); syncToUrl('scenario', e.target.value); },
+  'click #swapCompare'(e, i) {
+    const a = i.selectedTagA.get();
+    const b = i.selectedTagB.get();
+    i.selectedTagA.set(b);
+    i.selectedTagB.set(a);
+    syncToUrl('a', b);
+    syncToUrl('b', a);
   },
 });
