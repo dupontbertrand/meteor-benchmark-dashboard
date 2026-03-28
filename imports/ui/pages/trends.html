@@ -1,18 +1,19 @@
 <template name="trends">
   <h2>Performance Trends</h2>
 
-  <div class="row mb-4">
-    <div class="col-md-4">
+  <!-- Filters -->
+  <div class="row mb-3">
+    <div class="col-md-3">
       <label class="form-label">Scenario</label>
-      <select class="form-select" id="trendScenario">
+      <select class="form-select form-select-sm" id="trendScenario">
         {{#each scenarios}}
           <option value="{{this}}">{{this}}</option>
         {{/each}}
       </select>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
       <label class="form-label">Metric</label>
-      <select class="form-select" id="trendMetric">
+      <select class="form-select form-select-sm" id="trendMetric">
         <option value="wall_clock">Wall Clock (s)</option>
         <option value="cpu_avg">APP CPU avg (%)</option>
         <option value="ram_avg">APP RAM avg (MB)</option>
@@ -21,10 +22,18 @@
         <option value="gc_count">GC count</option>
       </select>
     </div>
-    <div class="col-md-4">
-      <label class="form-label">Tag filter (optional)</label>
-      <select class="form-select" id="trendTag">
-        <option value="">All tags</option>
+    <div class="col-md-3">
+      <label class="form-label">Primary tag</label>
+      <select class="form-select form-select-sm" id="trendTag">
+        {{#each tags}}
+          <option value="{{this}}">{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Compare with (optional)</label>
+      <select class="form-select form-select-sm" id="trendCompareTag">
+        <option value="">None</option>
         {{#each tags}}
           <option value="{{this}}">{{this}}</option>
         {{/each}}
@@ -32,19 +41,73 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-body">
-      <canvas id="trendChart" height="100"></canvas>
-    </div>
-  </div>
+  {{#if hasData}}
 
-  {{#unless hasData}}
+    <!-- Chart + context panel -->
+    <div class="row mb-3">
+      <div class="col-md-9">
+        <div class="card">
+          <div class="card-body py-2">
+            <canvas id="trendChart" height="90"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card h-100">
+          <div class="card-header py-2"><strong>{{selectedTag}}</strong></div>
+          <div class="card-body py-2">
+            <table class="table table-sm table-borderless mb-0" style="font-size: 0.85rem">
+              {{#with stats}}
+                <tr><td class="text-muted">Latest</td><td class="fw-bold">{{latest}}</td></tr>
+                <tr><td class="text-muted">Median</td><td>{{median}}</td></tr>
+                <tr><td class="text-muted">Min</td><td>{{min}}</td></tr>
+                <tr><td class="text-muted">Max</td><td>{{max}}</td></tr>
+                <tr><td class="text-muted">Runs</td><td>{{count}}</td></tr>
+                <tr><td class="text-muted">Last run</td><td>{{lastRun}}</td></tr>
+              {{/with}}
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Metric explanation -->
+    <div class="card mb-3">
+      <div class="card-body text-muted small py-2">
+        {{{metricExplanation}}}
+      </div>
+    </div>
+
+    <!-- Cross-version comparison table -->
+    {{#if hasCrossVersion}}
+    <h5 class="mt-4">Latest values across versions</h5>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered">
+        <thead class="table-light">
+          <tr>
+            <th>Tag</th>
+            <th>Latest</th>
+            <th>Median</th>
+            <th>Runs</th>
+            <th>Last run</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each crossVersionRows}}
+            <tr>
+              <td><span class="badge" style="background-color: {{color}}">{{tag}}</span></td>
+              <td class="fw-bold">{{latest}}</td>
+              <td>{{median}}</td>
+              <td>{{count}}</td>
+              <td class="text-muted" style="font-size: 0.8rem">{{lastRun}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+    {{/if}}
+
+  {{else}}
     <div class="alert alert-info mt-3">No data for this selection yet.</div>
-  {{/unless}}
-
-  <div class="card mt-3">
-    <div class="card-body text-muted small">
-      {{{metricExplanation}}}
-    </div>
-  </div>
+  {{/if}}
 </template>
