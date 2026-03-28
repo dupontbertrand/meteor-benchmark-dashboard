@@ -29,6 +29,14 @@
           <option value="{{this}}" selected={{isSelected this "tag"}}>{{this}}</option>
         {{/each}}
       </select>
+      {{#if hasConfigs}}
+      <select class="form-select form-select-sm mt-1" id="trendConfig">
+        <option value="" selected={{isSelected "" "config"}}>Any config</option>
+        {{#each configOptions}}
+          <option value="{{this}}" selected={{isSelected this "config"}}>{{this}}</option>
+        {{/each}}
+      </select>
+      {{/if}}
     </div>
     <div class="col">
       <label class="form-label">Compare with</label>
@@ -38,6 +46,14 @@
           <option value="{{this}}" selected={{isSelected this "compare"}}>{{this}}</option>
         {{/each}}
       </select>
+      {{#if hasConfigs}}
+      <select class="form-select form-select-sm mt-1" id="trendCompareConfig">
+        <option value="" selected={{isSelected "" "compareConfig"}}>Any config</option>
+        {{#each configOptions}}
+          <option value="{{this}}" selected={{isSelected this "compareConfig"}}>{{this}}</option>
+        {{/each}}
+      </select>
+      {{/if}}
     </div>
     <div class="col">
       <label class="form-label">Range</label>

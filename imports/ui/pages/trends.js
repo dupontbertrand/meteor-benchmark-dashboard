@@ -81,6 +81,8 @@ Template.trends.onCreated(function () {
   this.selectedMetric = new ReactiveVar(FlowRouter.getQueryParam('metric') || 'gc_total');
   this.selectedTag = new ReactiveVar(FlowRouter.getQueryParam('tag') || '');
   this.compareTag = new ReactiveVar(FlowRouter.getQueryParam('compare') || '');
+  this.selectedConfig = new ReactiveVar(FlowRouter.getQueryParam('config') || '');
+  this.compareConfig = new ReactiveVar(FlowRouter.getQueryParam('compareConfig') || '');
   this.selectedRange = new ReactiveVar(FlowRouter.getQueryParam('range') || '25');
   this.chart = null;
 
@@ -108,18 +110,29 @@ Template.trends.onRendered(function () {
     const metric = this.selectedMetric.get();
     const primaryTag = this.selectedTag.get();
     const compareTag = this.compareTag.get();
+    const primaryConfig = this.selectedConfig.get();
+    const compareConfigVal = this.compareConfig.get();
     const range = this.selectedRange.get();
     if (!scenario || !primaryTag) return;
 
     const extractor = METRIC_EXTRACTORS[metric];
     if (!extractor) return;
 
-    // Build datasets: primary tag always shown, compare tag optional
-    const tagsToShow = [primaryTag];
-    if (compareTag && compareTag !== primaryTag) tagsToShow.push(compareTag);
+    function matchesConfig(run, cfgFilter) {
+      if (!cfgFilter) return true; // "Any config"
+      if (cfgFilter === 'default') return !run.config || Object.keys(run.config).length === 0;
+      // cfgFilter is "key: value"
+      const [k, v] = cfgFilter.split(': ');
+      return run.config?.[k] === v;
+    }
 
-    const datasets = tagsToShow.map((tag, i) => {
-      const allRuns = Runs.find({ scenario, tag }, { sort: { timestamp: 1 } }).fetch();
+    // Build datasets: primary tag always shown, compare tag optional
+    const lines = [{ tag: primaryTag, cfg: primaryConfig }];
+    if (compareTag) lines.push({ tag: compareTag, cfg: compareConfigVal });
+
+    const datasets = lines.map(({ tag, cfg }, i) => {
+      const allRuns = Runs.find({ scenario, tag }, { sort: { timestamp: 1 } }).fetch()
+        .filter(r => matchesConfig(r, cfg));
       const runs = applyRange(allRuns, range);
       const points = [];
       for (const run of runs) {
@@ -128,8 +141,9 @@ Template.trends.onRendered(function () {
           points.push({ x: new Date(run.timestamp), y: val });
         }
       }
+      const label = cfg ? `${tag} [${cfg}]` : tag;
       return {
-        label: tag,
+        label,
         data: points,
         borderColor: COLORS[i],
         backgroundColor: COLORS[i] + '30',
@@ -209,9 +223,32 @@ Template.trends.helpers({
       metric: t.selectedMetric,
       tag: t.selectedTag,
       compare: t.compareTag,
+      config: t.selectedConfig,
+      compareConfig: t.compareConfig,
       range: t.selectedRange,
     };
     return map[field]?.get() === value ? 'selected' : null;
+  },
+
+  hasConfigs() {
+    const scenario = Template.instance().selectedScenario.get();
+    if (!scenario) return false;
+    return Runs.find({ scenario, config: { $exists: true } }).count() > 0;
+  },
+
+  configOptions() {
+    const scenario = Template.instance().selectedScenario.get();
+    if (!scenario) return [];
+    const runs = Runs.find({ scenario }).fetch();
+    const options = new Set();
+    for (const r of runs) {
+      if (r.config && Object.keys(r.config).length > 0) {
+        for (const [k, v] of Object.entries(r.config)) {
+          options.add(`${k}: ${v}`);
+        }
+      }
+    }
+    return ['default', ...Array.from(options).sort()];
   },
 
   hasData() {
@@ -294,5 +331,7 @@ Template.trends.events({
   'change #trendMetric'(e, i) { i.selectedMetric.set(e.target.value); syncToUrl('metric', e.target.value); },
   'change #trendTag'(e, i) { i.selectedTag.set(e.target.value); syncToUrl('tag', e.target.value); },
   'change #trendCompareTag'(e, i) { i.compareTag.set(e.target.value); syncToUrl('compare', e.target.value); },
+  'change #trendConfig'(e, i) { i.selectedConfig.set(e.target.value); syncToUrl('config', e.target.value); },
+  'change #trendCompareConfig'(e, i) { i.compareConfig.set(e.target.value); syncToUrl('compareConfig', e.target.value); },
   'change #trendRange'(e, i) { i.selectedRange.set(e.target.value); syncToUrl('range', e.target.value); },
 });
