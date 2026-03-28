@@ -261,19 +261,22 @@ Template.trends.helpers({
     if (!scenario || !extractor) return [];
 
     const allRuns = Runs.find({ scenario }, { sort: { timestamp: 1 } }).fetch();
-    const byTag = {};
+    const byKey = {};
     for (const run of allRuns) {
-      if (!byTag[run.tag]) byTag[run.tag] = [];
+      const cfgSuffix = run.config ? ` [${Object.values(run.config).join(', ')}]` : '';
+      const key = run.tag + cfgSuffix;
+      if (!byKey[key]) byKey[key] = { tag: run.tag, config: run.config, entries: [] };
       const val = extractor(run);
-      if (val != null) byTag[run.tag].push({ val, timestamp: run.timestamp });
+      if (val != null) byKey[key].entries.push({ val, timestamp: run.timestamp });
     }
 
-    return Object.entries(byTag).map(([tag, entries], i) => {
-      const values = entries.map(e => e.val);
+    return Object.values(byKey).map((group, i) => {
+      const values = group.entries.map(e => e.val);
       const sorted = [...values].sort((a, b) => a - b);
-      const last = entries[entries.length - 1];
+      const last = group.entries[group.entries.length - 1];
       return {
-        tag,
+        tag: group.tag,
+        config: group.config,
         color: COLORS[i % COLORS.length],
         latest: fmtVal(values[values.length - 1], metric),
         median: fmtVal(sorted[Math.floor(sorted.length / 2)], metric),

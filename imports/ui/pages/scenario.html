@@ -55,7 +55,7 @@
             {{#each runs}}
               <tr>
                 <td>{{formatDate timestamp}}</td>
-                <td><span class="badge bg-primary">{{tag}}</span></td>
+                <td><span class="badge bg-primary">{{tag}}</span> {{{configBadges config}}}</td>
                 <td>{{formatMs wall_clock_ms}}</td>
                 <td>{{cpuAvg}}%</td>
                 <td>{{ramAvg}} MB</td>

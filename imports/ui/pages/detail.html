@@ -3,7 +3,7 @@
     {{#with run}}
       <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>
-          <span class="badge bg-primary">{{tag}}</span>
+          <span class="badge bg-primary">{{tag}}</span> {{{configBadges config}}}
           <a href="/scenario/{{scenario}}" class="text-decoration-none">{{scenario}}</a>
         </h2>
         <a href="/" class="btn btn-outline-secondary">Back</a>
@@ -16,7 +16,7 @@
             <div class="card-body">
               <table class="table table-sm mb-0">
                 <tr><td>Date</td><td>{{formatDate timestamp}}</td></tr>
-                <tr><td>Tag</td><td>{{tag}}</td></tr>
+                <tr><td>Tag</td><td>{{tag}} {{{configBadges config}}}</td></tr>
                 <tr><td>Scenario</td><td>{{scenario}}</td></tr>
                 <tr><td>Meteor version</td><td>{{meteor.version}}</td></tr>
                 <tr><td>Meteor SHA</td><td><code>{{meteor.sha}}</code></td></tr>

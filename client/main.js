@@ -1,5 +1,8 @@
 import { FlowRouter } from 'meteor/ostrio:flow-router-extra';
 
+// Global helpers
+import '../imports/ui/lib/global-helpers.js';
+
 // Layouts
 import '../imports/ui/layouts/main.js';
 

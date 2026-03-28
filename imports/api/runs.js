@@ -69,6 +69,44 @@ if (Meteor.isServer) {
       const runs = await Runs.find({}, { fields: { scenario: 1 } }).fetchAsync();
       return [...new Set(runs.map((r) => r.scenario))];
     },
+
+    // One-time migration: split compound tags like "release-3.5-uws" into
+    // tag "release-3.5" + config { transport: "uws" }
+    async 'runs.migrateCompoundTags'(apiKey) {
+      check(apiKey, String);
+      const expectedKey = Meteor.settings?.benchApiKey;
+      if (!expectedKey || apiKey !== expectedKey) {
+        throw new Meteor.Error('unauthorized', 'Invalid API key');
+      }
+
+      const suffixes = { uws: 'uws', sockjs: 'sockjs' };
+      const runs = await Runs.find({ config: { $exists: false } }).fetchAsync();
+      let migrated = 0;
+
+      for (const run of runs) {
+        for (const [suffix, transport] of Object.entries(suffixes)) {
+          if (run.tag?.endsWith(`-${suffix}`)) {
+            const newTag = run.tag.slice(0, -(suffix.length + 1));
+            await Runs.updateAsync(run._id, {
+              $set: { tag: newTag, config: { transport } },
+            });
+            migrated++;
+            break;
+          }
+        }
+      }
+
+      return { migrated, total: runs.length };
+    },
+
+    async 'runs.distinctConfigKeys'() {
+      const runs = await Runs.find({ config: { $exists: true } }, { fields: { config: 1 } }).fetchAsync();
+      const keys = new Set();
+      for (const r of runs) {
+        if (r.config) Object.keys(r.config).forEach(k => keys.add(k));
+      }
+      return [...keys];
+    },
   });
 }
 
