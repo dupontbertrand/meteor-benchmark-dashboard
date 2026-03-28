@@ -63,12 +63,22 @@ Template.compare.helpers({
       const delta = ((targetVal - baseVal) / baseVal) * 100;
       const deltaFixed = delta.toFixed(1);
       const isWorse = delta > 0;
+
+      // Relative language
+      const ratio = targetVal / baseVal;
+      let relativeStr = '';
+      if (Math.abs(ratio - 1) > 0.05) {
+        if (ratio < 1) relativeStr = `${(1 / ratio).toFixed(2)}x faster`;
+        else relativeStr = `${ratio.toFixed(2)}x slower`;
+      }
+
       rows.push({
         label,
         tooltip: tooltips[label] || '',
         baselineVal: `${baseVal.toFixed?.(1) ?? baseVal}${unit}`,
         targetVal: `${targetVal.toFixed?.(1) ?? targetVal}${unit}`,
         deltaStr: `${delta > 0 ? '+' : ''}${deltaFixed}%`,
+        relativeStr,
         deltaClass: Math.abs(delta) < 5 ? '' : isWorse ? 'text-danger fw-bold' : 'text-success fw-bold',
         statusIcon: Math.abs(delta) < 5
           ? '<span class="badge bg-secondary">~</span>'

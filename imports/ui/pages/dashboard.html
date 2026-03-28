@@ -1,25 +1,115 @@
 <template name="dashboard">
-  <h2>Recent Benchmark Runs</h2>
+
+  <!-- Release Health Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h2 class="mb-0">Release Health</h2>
+      <small class="text-muted">
+        Comparing <strong>{{targetTag}}</strong> against <strong>{{baselineTag}}</strong>
+      </small>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <select class="form-select form-select-sm" id="healthBaseline" style="width: auto;">
+        {{#each tags}}
+          <option value="{{this}}" selected="{{isBaseline this}}">{{this}}</option>
+        {{/each}}
+      </select>
+      <span class="text-muted">vs</span>
+      <select class="form-select form-select-sm" id="healthTarget" style="width: auto;">
+        {{#each tags}}
+          <option value="{{this}}" selected="{{isTarget this}}">{{this}}</option>
+        {{/each}}
+      </select>
+    </div>
+  </div>
 
   {{#if Template.subscriptionsReady}}
-    {{#if hasRuns}}
-      <div class="table-responsive">
-        <table class="table table-striped table-hover">
+
+    <!-- Performance Fingerprint -->
+    {{#if hasFingerprint}}
+    <div class="card mb-4">
+      <div class="card-body py-2">
+        <div class="row text-center">
+          {{#each fingerprint}}
+            <div class="col">
+              <div class="small text-muted">{{label}}</div>
+              <div class="fs-5 fw-bold">{{value}}</div>
+              <div class="small {{{deltaClass}}}">{{delta}}</div>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- Grouped by family -->
+    {{#each families}}
+      <div class="card mb-3">
+        <div class="card-header py-2 d-flex align-items-center gap-2">
+          <span>{{icon}}</span>
+          <strong>{{label}}</strong>
+          <span class="badge bg-secondary ms-auto">{{scenarioCount}} scenarios</span>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr class="table-light">
+                <th style="width: 28%">Scenario</th>
+                <th style="width: 12%">Wall Clock</th>
+                <th style="width: 12%">CPU avg</th>
+                <th style="width: 12%">RAM avg</th>
+                <th style="width: 12%">GC pause</th>
+                <th style="width: 14%">vs baseline</th>
+                <th style="width: 10%">Runs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{#each rows}}
+                <tr>
+                  <td>
+                    <a href="/scenario/{{scenario}}">{{scenarioLabel}}</a>
+                    <div class="text-muted" style="font-size: 0.72rem">{{interpret}}</div>
+                  </td>
+                  <td>{{wallClock}}</td>
+                  <td>{{cpu}}</td>
+                  <td>{{ram}}</td>
+                  <td>{{gc}}</td>
+                  <td>{{{verdict}}}</td>
+                  <td>
+                    <span class="text-muted" style="font-size: 0.8rem">{{runCount}}</span>
+                  </td>
+                </tr>
+              {{/each}}
+              {{#unless rows}}
+                <tr><td colspan="7" class="text-muted text-center py-2">No data yet</td></tr>
+              {{/unless}}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {{/each}}
+
+    <!-- Recent runs (collapsed) -->
+    <details class="mb-4">
+      <summary class="text-muted" style="cursor: pointer">
+        Show all recent runs ({{totalRunCount}})
+      </summary>
+      <div class="table-responsive mt-2">
+        <table class="table table-striped table-hover table-sm">
           <thead class="table-dark">
             <tr>
               <th>Date</th>
               <th>Tag</th>
               <th>Scenario</th>
               <th>Wall Clock</th>
-              <th>CPU avg</th>
-              <th>RAM avg</th>
-              <th>GC pause</th>
-              <th>Status</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>GC</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {{#each runs}}
+            {{#each recentRuns}}
               <tr>
                 <td>{{formatDate timestamp}}</td>
                 <td><span class="badge bg-primary">{{tag}}</span></td>
@@ -28,18 +118,14 @@
                 <td>{{cpuAvg}}%</td>
                 <td>{{ramAvg}} MB</td>
                 <td>{{gcPause}} ms</td>
-                <td>{{{statusBadge}}}</td>
-                <td><a href="/run/{{_id}}" class="btn btn-sm btn-outline-secondary">Detail</a></td>
+                <td><a href="/run/{{_id}}" class="btn btn-sm btn-outline-secondary py-0">Detail</a></td>
               </tr>
             {{/each}}
           </tbody>
         </table>
       </div>
-    {{else}}
-      <div class="alert alert-info">
-        No benchmark runs yet. Push results with: <code>node bench.js push --result &lt;file.json&gt;</code>
-      </div>
-    {{/if}}
+    </details>
+
   {{else}}
     <div class="text-center my-5">
       <div class="spinner-border" role="status"></div>

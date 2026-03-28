@@ -41,6 +41,7 @@
               <th>{{selectedTagA}} (baseline)</th>
               <th>{{selectedTagB}} (target)</th>
               <th>Delta</th>
+              <th>Relative</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -51,6 +52,7 @@
                 <td>{{baselineVal}}</td>
                 <td>{{targetVal}}</td>
                 <td class="{{deltaClass}}">{{{deltaStr}}}</td>
+                <td class="text-muted" style="font-size: 0.85rem">{{relativeStr}}</td>
                 <td>{{{statusIcon}}}</td>
               </tr>
             {{/each}}
