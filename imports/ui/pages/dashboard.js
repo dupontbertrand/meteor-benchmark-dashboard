@@ -233,4 +233,10 @@ Template.dashboard.events({
   'change #healthTarget'(event, instance) {
     instance.targetTag.set(event.target.value);
   },
+  'click #swapTags'(event, instance) {
+    const a = instance.baselineTag.get();
+    const b = instance.targetTag.get();
+    instance.baselineTag.set(b);
+    instance.targetTag.set(a);
+  },
 });

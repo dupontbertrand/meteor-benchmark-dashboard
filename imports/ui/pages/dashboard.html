@@ -14,7 +14,7 @@
           <option value="{{this}}" selected="{{isBaseline this}}">{{this}}</option>
         {{/each}}
       </select>
-      <span class="text-muted">vs</span>
+      <button class="btn btn-sm btn-outline-secondary" id="swapTags" title="Swap baseline and target">⇄</button>
       <select class="form-select form-select-sm" id="healthTarget" style="width: auto;">
         {{#each tags}}
           <option value="{{this}}" selected="{{isTarget this}}">{{this}}</option>

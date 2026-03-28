@@ -127,4 +127,10 @@ Template.compare.events({
   'change #scenarioFilter'(event, instance) {
     instance.selectedScenario.set(event.target.value);
   },
+  'click #swapCompare'(event, instance) {
+    const a = instance.selectedTagA.get();
+    const b = instance.selectedTagB.get();
+    instance.selectedTagA.set(b);
+    instance.selectedTagB.set(a);
+  },
 });
