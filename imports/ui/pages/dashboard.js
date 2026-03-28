@@ -11,26 +11,6 @@ function syncToUrl(key, value) {
   if (current !== value) FlowRouter.setQueryParams({ [key]: value || null });
 }
 
-Template.dashboard.onCreated(function () {
-  this.subscribe('runs.recent', 200);
-  this.tags = new ReactiveVar([]);
-  this.baselineTag = new ReactiveVar(FlowRouter.getQueryParam('ref') || 'release-3.5');
-  this.targetTag = new ReactiveVar(FlowRouter.getQueryParam('test') || 'devel');
-
-  Meteor.callAsync('runs.distinctTags').then((tags) => {
-    this.tags.set(tags);
-    // Only auto-select if no query params
-    if (!FlowRouter.getQueryParam('ref')) {
-      const releases = tags.filter(t => /^release-3\.\d+$/.test(t));
-      releases.sort((a, b) => parseFloat(b.replace('release-', '')) - parseFloat(a.replace('release-', '')));
-      if (releases.length > 0) this.baselineTag.set(releases[0]);
-    }
-    if (!FlowRouter.getQueryParam('test') && tags.includes('devel')) {
-      this.targetTag.set('devel');
-    }
-  });
-});
-
 // ─── Utility functions ──────────────────────────────────────────────
 
 function fmt(val, unit, decimals = 1) {
@@ -46,6 +26,48 @@ function pctDelta(baseline, target) {
 function deltaStr(d) {
   if (d == null) return '';
   return `${d > 0 ? '+' : ''}${d.toFixed(1)}%`;
+}
+
+/**
+ * Auto-detect the latest stable release tag to compare against.
+ * Picks the highest release-X.Y tag that isn't the selected branch.
+ */
+function detectReference(tags, selectedBranch) {
+  const releases = tags
+    .filter(t => /^release-\d+\.\d+$/.test(t) && t !== selectedBranch)
+    .sort((a, b) => {
+      const av = parseFloat(a.replace('release-', ''));
+      const bv = parseFloat(b.replace('release-', ''));
+      return bv - av;
+    });
+  return releases[0] || null;
+}
+
+/**
+ * Compute stability: compare last run vs median of previous runs for a scenario+tag.
+ * Returns { stable, trend, label }
+ */
+function computeStability(runs) {
+  if (runs.length < 3) return { label: `${runs.length} runs`, badge: '<span class="text-muted" style="font-size:0.75rem">not enough data</span>' };
+
+  const sorted = [...runs].sort((a, b) => a.timestamp - b.timestamp);
+  const latest = sorted[sorted.length - 1];
+  const previous = sorted.slice(0, -1);
+
+  // Use GC if available, fallback to wall clock
+  const getVal = (r) => r.metrics?.gc?.total_pause_ms ?? r.wall_clock_ms;
+  const latestVal = getVal(latest);
+  const prevVals = previous.map(getVal).filter(v => v != null);
+  if (!prevVals.length || latestVal == null) return { label: '-', badge: '<span class="text-muted">-</span>' };
+
+  const prevMedian = prevVals.sort((a, b) => a - b)[Math.floor(prevVals.length / 2)];
+  const delta = pctDelta(prevMedian, latestVal);
+  if (delta == null) return { label: '-', badge: '<span class="text-muted">-</span>' };
+
+  if (Math.abs(delta) < 10) return { label: 'stable', badge: '<span class="badge bg-success">stable</span>' };
+  if (delta > 25) return { label: `${deltaStr(delta)}`, badge: `<span class="badge bg-danger">${deltaStr(delta)}</span>` };
+  if (delta > 0) return { label: `${deltaStr(delta)}`, badge: `<span class="badge bg-warning text-dark">${deltaStr(delta)}</span>` };
+  return { label: `${deltaStr(delta)}`, badge: `<span class="badge bg-success">${deltaStr(delta)}</span>` };
 }
 
 function verdictHtml(bRun, tRun) {
@@ -64,7 +86,6 @@ function verdictHtml(bRun, tRun) {
   check('CPU', bRun.metrics?.app_resources?.cpu?.avg, tRun.metrics?.app_resources?.cpu?.avg, 10);
   check('RAM', bRun.metrics?.app_resources?.memory?.avg_mb, tRun.metrics?.app_resources?.memory?.avg_mb, 10);
 
-  // Fallback to wall clock for scenarios without app metrics (cold-start, bundle-size, hot-reload)
   if (parts.length === 0 && bRun.wall_clock_ms && tRun.wall_clock_ms) {
     check('Time', bRun.wall_clock_ms, tRun.wall_clock_ms, 5);
   }
@@ -73,89 +94,131 @@ function verdictHtml(bRun, tRun) {
   return `<div style="font-size: 0.8rem; line-height: 1.4">${parts.join('<br>')}</div>`;
 }
 
-function getBaselineAndTarget(instance) {
-  const baseline = instance.baselineTag.get();
-  const target = instance.targetTag.get();
-  const bRuns = Runs.find({ tag: baseline }).fetch();
-  const tRuns = Runs.find({ tag: target }).fetch();
-  return { baseline, target, bRuns, tRuns };
-}
+// ─── Template ───────────────────────────────────────────────────────
 
-// ─── Template helpers ───────────────────────────────────────────────
+Template.dashboard.onCreated(function () {
+  this.subscribe('runs.recent', 200);
+  this.tags = new ReactiveVar([]);
+  this.selectedBranch = new ReactiveVar(FlowRouter.getQueryParam('branch') || 'devel');
+  this.referenceTag = new ReactiveVar('');
+
+  Meteor.callAsync('runs.distinctTags').then((tags) => {
+    this.tags.set(tags);
+    const branch = this.selectedBranch.get();
+    if (!tags.includes(branch) && tags.length > 0) {
+      this.selectedBranch.set(tags[0]);
+    }
+    this.referenceTag.set(detectReference(tags, this.selectedBranch.get()));
+  });
+
+  // Update reference when branch changes
+  this.autorun(() => {
+    const branch = this.selectedBranch.get();
+    const tags = this.tags.get();
+    if (tags.length > 0) {
+      this.referenceTag.set(detectReference(tags, branch));
+    }
+  });
+});
+
+// ─── Helpers ────────────────────────────────────────────────────────
 
 Template.dashboard.helpers({
   tags() { return Template.instance().tags.get(); },
-  baselineTag() { return Template.instance().baselineTag.get(); },
-  targetTag() { return Template.instance().targetTag.get(); },
-  isBaseline(tag) { return tag === Template.instance().baselineTag.get() ? 'selected' : null; },
-  isTarget(tag) { return tag === Template.instance().targetTag.get() ? 'selected' : null; },
+  selectedBranch() { return Template.instance().selectedBranch.get(); },
+  referenceTag() { return Template.instance().referenceTag.get(); },
 
-  // ─── Section 1: Release diagnosis ─────────────────────────────
-  diagnosis() {
-    const { bRuns, tRuns, baseline, target } = getBaselineAndTarget(Template.instance());
-    if (!bRuns.length || !tRuns.length) return null;
-
-    const deltas = computeAllDeltas(bRuns, tRuns);
-    const regressions = deltas.filter(d => d.delta > 0);
-    const improvements = deltas.filter(d => d.delta < 0);
-
-    const worstRegression = regressions[0];
-    const bestImprovement = improvements[0];
-
-    // Determine verdict
-    let verdict, badgeClass, borderClass, summary;
-    const hasHardFail = regressions.some(d => d.delta > 25);
-    const hasWarning = regressions.some(d => d.delta > 10);
-
-    if (hasHardFail) {
-      verdict = 'Regression risk';
-      badgeClass = 'danger';
-      borderClass = 'danger';
-      const areas = [...new Set(regressions.filter(d => d.delta > 25).map(d => d.familyLabel))].join(', ');
-      summary = `${target} has significant regressions vs ${baseline} in: ${areas}`;
-    } else if (hasWarning) {
-      verdict = 'Watch';
-      badgeClass = 'warning';
-      borderClass = 'warning';
-      summary = `${target} has minor regressions vs ${baseline} — monitor before release`;
-    } else if (improvements.length > 0) {
-      verdict = 'Healthy';
-      badgeClass = 'success';
-      borderClass = 'success';
-      summary = `${target} improves over ${baseline}`;
-    } else {
-      verdict = 'Healthy';
-      badgeClass = 'success';
-      borderClass = 'success';
-      summary = `${target} is on par with ${baseline}`;
-    }
-
-    const fmtDelta = (d) => d ? { ...d, deltaStr: deltaStr(d.delta) } : null;
-
-    return {
-      verdict, badgeClass, borderClass, summary,
-      hasHighlights: !!(worstRegression || bestImprovement),
-      topRegression: fmtDelta(worstRegression),
-      topImprovement: fmtDelta(bestImprovement),
-    };
+  isSelectedBranch(tag) {
+    return tag === Template.instance().selectedBranch.get() ? 'selected' : null;
   },
 
-  // ─── Section 2: Canonical fingerprint ─────────────────────────
+  // ─── Verdict ────────────────────────────────────────────────
+  diagnosis() {
+    const t = Template.instance();
+    const branch = t.selectedBranch.get();
+    const ref = t.referenceTag.get();
+    const branchRuns = Runs.find({ tag: branch }).fetch();
+    const refRuns = ref ? Runs.find({ tag: ref }).fetch() : [];
+
+    if (!branchRuns.length) {
+      return { verdict: 'No data', badgeClass: 'secondary', borderClass: 'secondary', summary: `No benchmark runs found for ${branch}` };
+    }
+
+    // vs reference
+    let vsRefVerdict = 'ok';
+    let vsRefSummary = '';
+    if (refRuns.length > 0) {
+      const deltas = computeAllDeltas(refRuns, branchRuns);
+      const regressions = deltas.filter(d => d.delta > 0);
+      const hasHardFail = regressions.some(d => d.delta > 25);
+      const hasWarning = regressions.some(d => d.delta > 10);
+
+      if (hasHardFail) {
+        vsRefVerdict = 'fail';
+        const areas = [...new Set(regressions.filter(d => d.delta > 25).map(d => d.familyLabel))].join(', ');
+        vsRefSummary = `Regressions vs ${ref} in: ${areas}`;
+      } else if (hasWarning) {
+        vsRefVerdict = 'warn';
+        vsRefSummary = `Minor regressions vs ${ref} — monitor before release`;
+      } else {
+        vsRefSummary = `No regressions vs ${ref}`;
+      }
+    } else {
+      vsRefSummary = 'No reference data to compare against';
+    }
+
+    // Stability over time
+    const scenarios = [...new Set(branchRuns.map(r => r.scenario))];
+    const unstable = [];
+    for (const scenario of scenarios) {
+      const scenarioRuns = branchRuns.filter(r => r.scenario === scenario).sort((a, b) => a.timestamp - b.timestamp);
+      if (scenarioRuns.length < 3) continue;
+      const stab = computeStability(scenarioRuns);
+      if (stab.label !== 'stable' && stab.label !== '-' && !stab.label.includes('runs')) {
+        unstable.push(scenario);
+      }
+    }
+
+    let stabilitySummary = '';
+    if (scenarios.length >= 3 && unstable.length === 0) {
+      stabilitySummary = 'Metrics are stable over recent runs';
+    } else if (unstable.length > 0) {
+      stabilitySummary = `Unstable: ${unstable.map(s => SCENARIO_META[s]?.label || s).join(', ')}`;
+    }
+
+    // Combined verdict
+    let verdict, badgeClass, borderClass;
+    if (vsRefVerdict === 'fail') {
+      verdict = 'Regression risk'; badgeClass = 'danger'; borderClass = 'danger';
+    } else if (vsRefVerdict === 'warn' || unstable.length > 0) {
+      verdict = 'Watch'; badgeClass = 'warning'; borderClass = 'warning';
+    } else {
+      verdict = 'Healthy'; badgeClass = 'success'; borderClass = 'success';
+    }
+
+    return { verdict, badgeClass, borderClass, summary: vsRefSummary, stabilitySummary };
+  },
+
+  // ─── Fingerprint ────────────────────────────────────────────
   hasFingerprint() {
-    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
-    return bRuns.length > 0 && tRuns.length > 0;
+    const branch = Template.instance().selectedBranch.get();
+    return Runs.find({ tag: branch }).count() > 0;
   },
 
   fingerprint() {
-    const { baseline, target, bRuns, tRuns } = getBaselineAndTarget(Template.instance());
+    const t = Template.instance();
+    const branch = t.selectedBranch.get();
+    const ref = t.referenceTag.get();
+    const branchRuns = Runs.find({ tag: branch }).fetch();
+    const refRuns = ref ? Runs.find({ tag: ref }).fetch() : [];
 
     return FINGERPRINT_AXES.map(axis => {
-      const bRun = bRuns.filter(r => r.scenario === axis.scenario).sort((a, b) => b.timestamp - a.timestamp)[0];
-      const tRun = tRuns.filter(r => r.scenario === axis.scenario).sort((a, b) => b.timestamp - a.timestamp)[0];
-      const bVal = axis.extract(bRun);
+      const tRun = branchRuns.filter(r => r.scenario === axis.scenario).sort((a, b) => b.timestamp - a.timestamp)[0];
+      const bRun = refRuns.filter(r => r.scenario === axis.scenario).sort((a, b) => b.timestamp - a.timestamp)[0];
       const tVal = axis.extract(tRun);
       if (tVal == null) return null;
 
+      const bVal = axis.extract(bRun);
       const d = pctDelta(bVal, tVal);
       return {
         label: axis.label,
@@ -167,45 +230,54 @@ Template.dashboard.helpers({
     }).filter(Boolean);
   },
 
-  // ─── Section 3: Top changes ───────────────────────────────────
+  // ─── Top changes ────────────────────────────────────────────
   hasChanges() {
-    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
-    return bRuns.length > 0 && tRuns.length > 0;
+    const t = Template.instance();
+    const ref = t.referenceTag.get();
+    if (!ref) return false;
+    const branch = t.selectedBranch.get();
+    return Runs.find({ tag: branch }).count() > 0 && Runs.find({ tag: ref }).count() > 0;
   },
 
   improvements() {
-    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
-    return computeAllDeltas(bRuns, tRuns)
-      .filter(d => d.delta < 0)
-      .slice(0, 5)
+    const t = Template.instance();
+    const refRuns = Runs.find({ tag: t.referenceTag.get() }).fetch();
+    const branchRuns = Runs.find({ tag: t.selectedBranch.get() }).fetch();
+    return computeAllDeltas(refRuns, branchRuns)
+      .filter(d => d.delta < 0).slice(0, 5)
       .map(d => ({ ...d, deltaStr: deltaStr(d.delta) }));
   },
 
   regressions() {
-    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
-    return computeAllDeltas(bRuns, tRuns)
-      .filter(d => d.delta > 0)
-      .slice(0, 5)
+    const t = Template.instance();
+    const refRuns = Runs.find({ tag: t.referenceTag.get() }).fetch();
+    const branchRuns = Runs.find({ tag: t.selectedBranch.get() }).fetch();
+    return computeAllDeltas(refRuns, branchRuns)
+      .filter(d => d.delta > 0).slice(0, 5)
       .map(d => ({ ...d, deltaStr: deltaStr(d.delta) }));
   },
 
-  // ─── Section 4: Family tables ─────────────────────────────────
+  // ─── Family tables ──────────────────────────────────────────
   families() {
-    const { baseline, target } = getBaselineAndTarget(Template.instance());
-    const allRuns = Runs.find({ tag: { $in: [baseline, target] } }).fetch();
-    const scenarioNames = [...new Set(allRuns.map(r => r.scenario))];
+    const t = Template.instance();
+    const branch = t.selectedBranch.get();
+    const ref = t.referenceTag.get();
+
+    const branchRuns = Runs.find({ tag: branch }).fetch();
+    const scenarioNames = [...new Set(branchRuns.map(r => r.scenario))];
+    if (scenarioNames.length === 0) return [];
+
     const groups = groupByFamily(scenarioNames);
 
     return Object.values(groups).map(family => {
       const rows = family.scenarios.map(scenario => {
         const meta = SCENARIO_META[scenario] || {};
-        const bRun = Runs.findOne({ tag: baseline, scenario }, { sort: { timestamp: -1 } });
-        const tRun = Runs.findOne({ tag: target, scenario }, { sort: { timestamp: -1 } });
-        const run = tRun || bRun;
+        const scenarioRuns = branchRuns.filter(r => r.scenario === scenario).sort((a, b) => b.timestamp - a.timestamp);
+        const run = scenarioRuns[0];
         if (!run) return null;
 
-        const targetRuns = Runs.find({ tag: target, scenario }).fetch();
-        const lastRun = targetRuns.sort((a, b) => b.timestamp - a.timestamp)[0];
+        const bRun = ref ? Runs.findOne({ tag: ref, scenario }, { sort: { timestamp: -1 } }) : null;
+        const stab = computeStability(scenarioRuns);
 
         return {
           scenario,
@@ -215,9 +287,10 @@ Template.dashboard.helpers({
           cpu: fmt(run.metrics?.app_resources?.cpu?.avg, '%'),
           ram: fmt(run.metrics?.app_resources?.memory?.avg_mb, ' MB', 0),
           gc: fmt(run.metrics?.gc?.total_pause_ms, ' ms', 0),
-          verdict: verdictHtml(bRun, tRun),
-          runCount: targetRuns.length,
-          lastRunDate: lastRun ? new Date(lastRun.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '',
+          verdict: verdictHtml(bRun, run),
+          stability: stab.badge,
+          runCount: scenarioRuns.length,
+          lastRunDate: new Date(run.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
         };
       }).filter(Boolean);
 
@@ -225,7 +298,7 @@ Template.dashboard.helpers({
     });
   },
 
-  // ─── Recent runs (collapsed) ──────────────────────────────────
+  // ─── Recent runs ────────────────────────────────────────────
   recentRuns() { return Runs.find({}, { sort: { timestamp: -1 }, limit: 50 }); },
   totalRunCount() { return Runs.find().count(); },
   formatDate(d) {
@@ -238,15 +311,11 @@ Template.dashboard.helpers({
   gcPause() { return this.metrics?.gc?.total_pause_ms?.toFixed(0) || '-'; },
 });
 
+// ─── Events ─────────────────────────────────────────────────────────
+
 Template.dashboard.events({
-  'change #healthBaseline'(e, i) { i.baselineTag.set(e.target.value); syncToUrl('ref', e.target.value); },
-  'change #healthTarget'(e, i) { i.targetTag.set(e.target.value); syncToUrl('test', e.target.value); },
-  'click #swapTags'(e, i) {
-    const a = i.baselineTag.get();
-    const b = i.targetTag.get();
-    i.baselineTag.set(b);
-    i.targetTag.set(a);
-    syncToUrl('ref', b);
-    syncToUrl('test', a);
+  'change #branchSelect'(e, i) {
+    i.selectedBranch.set(e.target.value);
+    syncToUrl('branch', e.target.value);
   },
 });

@@ -1,72 +1,43 @@
 <template name="dashboard">
 
-  <!-- Header + selectors -->
+  <!-- Header: single branch selector -->
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h2 class="mb-0">Release Health</h2>
+      <h2 class="mb-0">Branch Health</h2>
       <small class="text-muted">
-        How does <strong>{{targetTag}}</strong> perform compared to <strong>{{baselineTag}}</strong>?
+        How is <strong>{{selectedBranch}}</strong> doing?
+        {{#if referenceTag}}<span class="ms-1">Reference: <strong>{{referenceTag}}</strong></span>{{/if}}
       </small>
     </div>
-    <div class="d-flex gap-2 align-items-center">
-      <div class="text-end" style="font-size: 0.75rem">
-        <div class="text-muted">reference</div>
-        <select class="form-select form-select-sm" id="healthBaseline" style="width: auto;">
-          {{#each tags}}
-            <option value="{{this}}" selected={{isBaseline this}}>{{this}}</option>
-          {{/each}}
-        </select>
-      </div>
-      <button class="btn btn-sm btn-outline-secondary" id="swapTags" title="Swap">⇄</button>
-      <div style="font-size: 0.75rem">
-        <div class="text-muted">testing</div>
-        <select class="form-select form-select-sm" id="healthTarget" style="width: auto;">
-          {{#each tags}}
-            <option value="{{this}}" selected={{isTarget this}}>{{this}}</option>
-          {{/each}}
-        </select>
-      </div>
+    <div>
+      <select class="form-select form-select-sm" id="branchSelect" style="width: auto;">
+        {{#each tags}}
+          <option value="{{this}}" selected={{isSelectedBranch this}}>{{this}}</option>
+        {{/each}}
+      </select>
     </div>
   </div>
 
   {{#if Template.subscriptionsReady}}
 
-    <!-- ═══ SECTION 1: Release verdict ═══ -->
+    <!-- ═══ Verdict card ═══ -->
     {{#with diagnosis}}
       <div class="card mb-4 border-{{borderClass}}">
         <div class="card-body py-3">
-          <div class="d-flex align-items-center gap-3 mb-2">
+          <div class="d-flex align-items-center gap-3">
             <span class="badge bg-{{badgeClass}} fs-6 px-3 py-2">{{verdict}}</span>
-            <span class="text-muted">{{summary}}</span>
-          </div>
-
-          {{#if hasHighlights}}
-          <div class="row mt-2">
-            {{#if topImprovement}}
-            <div class="col-md-6">
-              <div class="small">
-                <span class="text-success fw-bold">Biggest improvement in {{targetTag}}</span>
-                <div>{{topImprovement.label}} — {{topImprovement.metric}} <strong>{{topImprovement.deltaStr}}</strong> vs {{baselineTag}}</div>
-                <div class="text-muted" style="font-size: 0.75rem">{{topImprovement.interpret}}</div>
-              </div>
+            <div>
+              <div>{{summary}}</div>
+              {{#if stabilitySummary}}
+                <div class="text-muted small mt-1">{{stabilitySummary}}</div>
+              {{/if}}
             </div>
-            {{/if}}
-            {{#if topRegression}}
-            <div class="col-md-6">
-              <div class="small">
-                <span class="text-danger fw-bold">Biggest regression in {{targetTag}}</span>
-                <div>{{topRegression.label}} — {{topRegression.metric}} <strong>{{topRegression.deltaStr}}</strong> vs {{baselineTag}}</div>
-                <div class="text-muted" style="font-size: 0.75rem">{{topRegression.interpret}}</div>
-              </div>
-            </div>
-            {{/if}}
           </div>
-          {{/if}}
         </div>
       </div>
     {{/with}}
 
-    <!-- ═══ SECTION 2: Canonical fingerprint ═══ -->
+    <!-- ═══ Fingerprint: key metrics at a glance ═══ -->
     {{#if hasFingerprint}}
     <div class="card mb-4">
       <div class="card-body py-2">
@@ -75,7 +46,9 @@
             <div class="col">
               <div class="small text-muted">{{label}}</div>
               <div class="fs-5 fw-bold">{{value}}</div>
-              <div class="small {{deltaClass}}">{{delta}}</div>
+              {{#if delta}}
+                <div class="small {{deltaClass}}">{{delta}} vs {{../referenceTag}}</div>
+              {{/if}}
               <div style="font-size: 0.65rem" class="text-muted">{{source}}</div>
             </div>
           {{/each}}
@@ -84,12 +57,12 @@
     </div>
     {{/if}}
 
-    <!-- ═══ SECTION 3: Top changes ═══ -->
+    <!-- ═══ Top changes vs reference ═══ -->
     {{#if hasChanges}}
     <div class="row mb-4">
       <div class="col-md-6">
         <div class="card h-100">
-          <div class="card-header py-2 text-success"><strong>Top improvements</strong></div>
+          <div class="card-header py-2 text-success"><strong>Improvements vs {{referenceTag}}</strong></div>
           <ul class="list-group list-group-flush">
             {{#each improvements}}
               <li class="list-group-item py-2">
@@ -100,18 +73,17 @@
                   </div>
                   <span class="text-success fw-bold">{{deltaStr}}</span>
                 </div>
-                <div class="text-muted" style="font-size: 0.72rem">{{interpret}}</div>
               </li>
             {{/each}}
             {{#unless improvements}}
-              <li class="list-group-item py-2 text-muted">No significant improvements detected</li>
+              <li class="list-group-item py-2 text-muted">No significant improvements</li>
             {{/unless}}
           </ul>
         </div>
       </div>
       <div class="col-md-6">
         <div class="card h-100">
-          <div class="card-header py-2 text-danger"><strong>Top regressions</strong></div>
+          <div class="card-header py-2 text-danger"><strong>Regressions vs {{referenceTag}}</strong></div>
           <ul class="list-group list-group-flush">
             {{#each regressions}}
               <li class="list-group-item py-2">
@@ -122,11 +94,10 @@
                   </div>
                   <span class="text-danger fw-bold">{{deltaStr}}</span>
                 </div>
-                <div class="text-muted" style="font-size: 0.72rem">{{interpret}}</div>
               </li>
             {{/each}}
             {{#unless regressions}}
-              <li class="list-group-item py-2 text-muted">No significant regressions detected</li>
+              <li class="list-group-item py-2 text-muted">No significant regressions</li>
             {{/unless}}
           </ul>
         </div>
@@ -134,7 +105,7 @@
     </div>
     {{/if}}
 
-    <!-- ═══ SECTION 4: Families ═══ -->
+    <!-- ═══ Scenario tables by family ═══ -->
     {{#each families}}
       <div class="card mb-3">
         <div class="card-header py-2 d-flex align-items-center gap-2">
@@ -146,13 +117,14 @@
           <table class="table table-sm mb-0">
             <thead>
               <tr class="table-light">
-                <th style="width: 28%">Scenario</th>
-                <th style="width: 12%">Wall Clock</th>
-                <th style="width: 12%">CPU avg</th>
-                <th style="width: 12%">RAM avg</th>
-                <th style="width: 12%">GC pause</th>
-                <th style="width: 14%">vs baseline</th>
-                <th style="width: 10%">Confidence</th>
+                <th style="width: 25%">Scenario</th>
+                <th style="width: 10%">Time</th>
+                <th style="width: 10%">CPU</th>
+                <th style="width: 10%">RAM</th>
+                <th style="width: 10%">GC</th>
+                <th style="width: 15%">vs {{../referenceTag}}</th>
+                <th style="width: 10%">Stability</th>
+                <th style="width: 10%">Runs</th>
               </tr>
             </thead>
             <tbody>
@@ -167,6 +139,7 @@
                   <td>{{ram}}</td>
                   <td>{{gc}}</td>
                   <td>{{{verdict}}}</td>
+                  <td>{{{stability}}}</td>
                   <td>
                     <div class="text-muted" style="font-size: 0.75rem">{{runCount}} runs</div>
                     <div class="text-muted" style="font-size: 0.68rem">{{lastRunDate}}</div>
@@ -174,7 +147,7 @@
                 </tr>
               {{/each}}
               {{#unless rows}}
-                <tr><td colspan="7" class="text-muted text-center py-2">No data yet</td></tr>
+                <tr><td colspan="8" class="text-muted text-center py-2">No data yet</td></tr>
               {{/unless}}
             </tbody>
           </table>
@@ -194,7 +167,7 @@
               <th>Date</th>
               <th>Tag</th>
               <th>Scenario</th>
-              <th>Wall Clock</th>
+              <th>Time</th>
               <th>CPU</th>
               <th>RAM</th>
               <th>GC</th>
