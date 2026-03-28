@@ -35,6 +35,12 @@ Template.compare.helpers({
   scenarios() { return Template.instance().scenarios.get(); },
   selectedTagA() { return Template.instance().selectedTagA.get(); },
   selectedTagB() { return Template.instance().selectedTagB.get(); },
+
+  isSelected(value, field) {
+    const t = Template.instance();
+    const map = { a: t.selectedTagA, b: t.selectedTagB, scenario: t.selectedScenario };
+    return map[field]?.get() === value ? 'selected' : null;
+  },
   showComparison() {
     const t = Template.instance();
     return t.selectedTagA.get() && t.selectedTagB.get();

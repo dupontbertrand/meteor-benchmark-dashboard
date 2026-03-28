@@ -5,9 +5,9 @@
     <div class="flex-fill">
       <label class="form-label">Baseline</label>
       <select class="form-select form-select-sm" id="tagA">
-        <option value="">Select tag...</option>
+        <option value="" selected={{isSelected "" "a"}}>Select tag...</option>
         {{#each tags}}
-          <option value="{{this}}">{{this}}</option>
+          <option value="{{this}}" selected={{isSelected this "a"}}>{{this}}</option>
         {{/each}}
       </select>
     </div>
@@ -17,18 +17,18 @@
     <div class="flex-fill">
       <label class="form-label">Target</label>
       <select class="form-select form-select-sm" id="tagB">
-        <option value="">Select tag...</option>
+        <option value="" selected={{isSelected "" "b"}}>Select tag...</option>
         {{#each tags}}
-          <option value="{{this}}">{{this}}</option>
+          <option value="{{this}}" selected={{isSelected this "b"}}>{{this}}</option>
         {{/each}}
       </select>
     </div>
     <div class="flex-fill">
       <label class="form-label">Scenario</label>
       <select class="form-select form-select-sm" id="scenarioFilter">
-        <option value="">All scenarios</option>
+        <option value="" selected={{isSelected "" "scenario"}}>All scenarios</option>
         {{#each scenarios}}
-          <option value="{{this}}">{{this}}</option>
+          <option value="{{this}}" selected={{isSelected this "scenario"}}>{{this}}</option>
         {{/each}}
       </select>
     </div>
