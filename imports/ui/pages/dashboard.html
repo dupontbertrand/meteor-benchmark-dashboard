@@ -1,6 +1,6 @@
 <template name="dashboard">
 
-  <!-- Release Health Header -->
+  <!-- Header + selectors -->
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       <h2 class="mb-0">Release Health</h2>
@@ -25,7 +25,42 @@
 
   {{#if Template.subscriptionsReady}}
 
-    <!-- Performance Fingerprint -->
+    <!-- ═══ SECTION 1: Release verdict ═══ -->
+    {{#with diagnosis}}
+      <div class="card mb-4 border-{{borderClass}}">
+        <div class="card-body py-3">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <span class="badge bg-{{badgeClass}} fs-6 px-3 py-2">{{verdict}}</span>
+            <span class="text-muted">{{summary}}</span>
+          </div>
+
+          {{#if hasHighlights}}
+          <div class="row mt-2">
+            {{#if topImprovement}}
+            <div class="col-md-6">
+              <div class="small">
+                <span class="text-success fw-bold">Biggest improvement</span>
+                <div>{{topImprovement.label}} — {{topImprovement.metric}} <strong>{{topImprovement.deltaStr}}</strong></div>
+                <div class="text-muted" style="font-size: 0.75rem">{{topImprovement.interpret}}</div>
+              </div>
+            </div>
+            {{/if}}
+            {{#if topRegression}}
+            <div class="col-md-6">
+              <div class="small">
+                <span class="text-danger fw-bold">Biggest regression</span>
+                <div>{{topRegression.label}} — {{topRegression.metric}} <strong>{{topRegression.deltaStr}}</strong></div>
+                <div class="text-muted" style="font-size: 0.75rem">{{topRegression.interpret}}</div>
+              </div>
+            </div>
+            {{/if}}
+          </div>
+          {{/if}}
+        </div>
+      </div>
+    {{/with}}
+
+    <!-- ═══ SECTION 2: Canonical fingerprint ═══ -->
     {{#if hasFingerprint}}
     <div class="card mb-4">
       <div class="card-body py-2">
@@ -35,6 +70,7 @@
               <div class="small text-muted">{{label}}</div>
               <div class="fs-5 fw-bold">{{value}}</div>
               <div class="small {{deltaClass}}">{{delta}}</div>
+              <div style="font-size: 0.65rem" class="text-muted">{{source}}</div>
             </div>
           {{/each}}
         </div>
@@ -42,7 +78,57 @@
     </div>
     {{/if}}
 
-    <!-- Grouped by family -->
+    <!-- ═══ SECTION 3: Top changes ═══ -->
+    {{#if hasChanges}}
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header py-2 text-success"><strong>Top improvements</strong></div>
+          <ul class="list-group list-group-flush">
+            {{#each improvements}}
+              <li class="list-group-item py-2">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <a href="/scenario/{{scenario}}">{{label}}</a>
+                    <span class="text-muted small"> — {{metric}}</span>
+                  </div>
+                  <span class="text-success fw-bold">{{deltaStr}}</span>
+                </div>
+                <div class="text-muted" style="font-size: 0.72rem">{{interpret}}</div>
+              </li>
+            {{/each}}
+            {{#unless improvements}}
+              <li class="list-group-item py-2 text-muted">No significant improvements detected</li>
+            {{/unless}}
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-header py-2 text-danger"><strong>Top regressions</strong></div>
+          <ul class="list-group list-group-flush">
+            {{#each regressions}}
+              <li class="list-group-item py-2">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <a href="/scenario/{{scenario}}">{{label}}</a>
+                    <span class="text-muted small"> — {{metric}}</span>
+                  </div>
+                  <span class="text-danger fw-bold">{{deltaStr}}</span>
+                </div>
+                <div class="text-muted" style="font-size: 0.72rem">{{interpret}}</div>
+              </li>
+            {{/each}}
+            {{#unless regressions}}
+              <li class="list-group-item py-2 text-muted">No significant regressions detected</li>
+            {{/unless}}
+          </ul>
+        </div>
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- ═══ SECTION 4: Families ═══ -->
     {{#each families}}
       <div class="card mb-3">
         <div class="card-header py-2 d-flex align-items-center gap-2">
@@ -60,7 +146,7 @@
                 <th style="width: 12%">RAM avg</th>
                 <th style="width: 12%">GC pause</th>
                 <th style="width: 14%">vs baseline</th>
-                <th style="width: 10%">Runs</th>
+                <th style="width: 10%">Confidence</th>
               </tr>
             </thead>
             <tbody>
@@ -76,7 +162,8 @@
                   <td>{{gc}}</td>
                   <td>{{{verdict}}}</td>
                   <td>
-                    <span class="text-muted" style="font-size: 0.8rem">{{runCount}}</span>
+                    <div class="text-muted" style="font-size: 0.75rem">{{runCount}} runs</div>
+                    <div class="text-muted" style="font-size: 0.68rem">{{lastRunDate}}</div>
                   </td>
                 </tr>
               {{/each}}

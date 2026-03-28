@@ -2,7 +2,7 @@ import { Template } from 'meteor/templating';
 import { ReactiveVar } from 'meteor/reactive-var';
 import { Meteor } from 'meteor/meteor';
 import { Runs } from '../../api/runs';
-import { SCENARIO_META, FAMILIES, groupByFamily } from '../lib/scenario-meta';
+import { SCENARIO_META, FAMILIES, FINGERPRINT_AXES, groupByFamily, computeAllDeltas } from '../lib/scenario-meta';
 import './dashboard.html';
 
 Template.dashboard.onCreated(function () {
@@ -13,88 +13,56 @@ Template.dashboard.onCreated(function () {
 
   Meteor.callAsync('runs.distinctTags').then((tags) => {
     this.tags.set(tags);
-    // Auto-select: latest release-3.x as baseline, devel as target
     const releases = tags.filter(t => /^release-3\.\d+$/.test(t));
-    releases.sort((a, b) => {
-      const numA = parseFloat(a.replace('release-', ''));
-      const numB = parseFloat(b.replace('release-', ''));
-      return numB - numA;
-    });
+    releases.sort((a, b) => parseFloat(b.replace('release-', '')) - parseFloat(a.replace('release-', '')));
     if (releases.length > 0) this.baselineTag.set(releases[0]);
     if (tags.includes('devel')) this.targetTag.set('devel');
   });
 });
 
-// ─── Helpers ────────────────────────────────────────────────────────
+// ─── Utility functions ──────────────────────────────────────────────
 
 function fmt(val, unit, decimals = 1) {
   if (val == null) return '-';
   return `${val.toFixed(decimals)}${unit}`;
 }
 
-function delta(baseline, target) {
+function pctDelta(baseline, target) {
   if (!baseline || !target || baseline === 0) return null;
   return ((target - baseline) / baseline) * 100;
 }
 
 function deltaStr(d) {
   if (d == null) return '';
-  const sign = d > 0 ? '+' : '';
-  return `${sign}${d.toFixed(1)}%`;
+  return `${d > 0 ? '+' : ''}${d.toFixed(1)}%`;
 }
 
-function ratioStr(baseline, target) {
-  if (!baseline || !target || baseline === 0) return '';
-  const ratio = target / baseline;
-  if (ratio < 1) return `${(1 / ratio).toFixed(2)}x faster`;
-  if (ratio > 1) return `${ratio.toFixed(2)}x slower`;
-  return 'same';
-}
-
-function verdictHtml(baselineRun, targetRun) {
-  if (!baselineRun || !targetRun) return '<span class="text-muted">-</span>';
-
-  // Pick the most meaningful metric: GC total pause (most reliable on shared runners)
-  const bGc = baselineRun.metrics?.gc?.total_pause_ms;
-  const tGc = targetRun.metrics?.gc?.total_pause_ms;
-  const bCpu = baselineRun.metrics?.app_resources?.cpu?.avg;
-  const tCpu = targetRun.metrics?.app_resources?.cpu?.avg;
-  const bWc = baselineRun.wall_clock_ms;
-  const tWc = targetRun.wall_clock_ms;
+function verdictHtml(bRun, tRun) {
+  if (!bRun || !tRun) return '<span class="text-muted">-</span>';
 
   const parts = [];
+  const check = (label, bVal, tVal, threshold) => {
+    if (!bVal || !tVal || bVal === 0) return;
+    const d = pctDelta(bVal, tVal);
+    if (d == null || Math.abs(d) < threshold) return;
+    const cls = d > 20 ? 'text-danger fw-bold' : d > 0 ? 'text-danger' : 'text-success';
+    parts.push(`<span class="${cls}">${label} ${deltaStr(d)}</span>`);
+  };
 
-  // Wall clock ratio
-  if (bWc && tWc) {
-    const r = tWc / bWc;
-    if (Math.abs(r - 1) > 0.05) {
-      const cls = r > 1.1 ? 'text-danger' : r < 0.9 ? 'text-success' : '';
-      parts.push(`<span class="${cls}">${ratioStr(bWc, tWc)}</span>`);
-    }
-  }
+  check('GC', bRun.metrics?.gc?.total_pause_ms, tRun.metrics?.gc?.total_pause_ms, 5);
+  check('CPU', bRun.metrics?.app_resources?.cpu?.avg, tRun.metrics?.app_resources?.cpu?.avg, 10);
+  check('RAM', bRun.metrics?.app_resources?.memory?.avg_mb, tRun.metrics?.app_resources?.memory?.avg_mb, 10);
 
-  // GC delta
-  if (bGc && tGc) {
-    const d = delta(bGc, tGc);
-    if (d != null && Math.abs(d) > 5) {
-      const cls = d > 20 ? 'text-danger fw-bold' : d > 0 ? 'text-danger' : 'text-success';
-      parts.push(`<span class="${cls}">GC ${deltaStr(d)}</span>`);
-    }
-  }
-
-  // CPU delta
-  if (bCpu && tCpu) {
-    const d = delta(bCpu, tCpu);
-    if (d != null && Math.abs(d) > 10) {
-      const cls = d > 25 ? 'text-danger fw-bold' : d > 0 ? 'text-danger' : 'text-success';
-      parts.push(`<span class="${cls}">CPU ${deltaStr(d)}</span>`);
-    }
-  }
-
-  if (parts.length === 0) {
-    return '<span class="badge bg-success">OK</span>';
-  }
+  if (parts.length === 0) return '<span class="badge bg-success">OK</span>';
   return `<div style="font-size: 0.8rem; line-height: 1.4">${parts.join('<br>')}</div>`;
+}
+
+function getBaselineAndTarget(instance) {
+  const baseline = instance.baselineTag.get();
+  const target = instance.targetTag.get();
+  const bRuns = Runs.find({ tag: baseline }).fetch();
+  const tRuns = Runs.find({ tag: target }).fetch();
+  return { baseline, target, bRuns, tRuns };
 }
 
 // ─── Template helpers ───────────────────────────────────────────────
@@ -106,78 +74,108 @@ Template.dashboard.helpers({
   isBaseline(tag) { return tag === Template.instance().baselineTag.get(); },
   isTarget(tag) { return tag === Template.instance().targetTag.get(); },
 
+  // ─── Section 1: Release diagnosis ─────────────────────────────
+  diagnosis() {
+    const { bRuns, tRuns, baseline, target } = getBaselineAndTarget(Template.instance());
+    if (!bRuns.length || !tRuns.length) return null;
+
+    const deltas = computeAllDeltas(bRuns, tRuns);
+    const regressions = deltas.filter(d => d.delta > 0);
+    const improvements = deltas.filter(d => d.delta < 0);
+
+    const worstRegression = regressions[0];
+    const bestImprovement = improvements[0];
+
+    // Determine verdict
+    let verdict, badgeClass, borderClass, summary;
+    const hasHardFail = regressions.some(d => d.delta > 25);
+    const hasWarning = regressions.some(d => d.delta > 10);
+
+    if (hasHardFail) {
+      verdict = 'Regression risk';
+      badgeClass = 'danger';
+      borderClass = 'danger';
+      const areas = [...new Set(regressions.filter(d => d.delta > 25).map(d => d.familyLabel))].join(', ');
+      summary = `Significant regressions detected in: ${areas}`;
+    } else if (hasWarning) {
+      verdict = 'Watch';
+      badgeClass = 'warning';
+      borderClass = 'warning';
+      summary = `Minor regressions detected — monitor before release`;
+    } else if (improvements.length > 0) {
+      verdict = 'Healthy';
+      badgeClass = 'success';
+      borderClass = 'success';
+      summary = `${target} shows improvements over ${baseline}`;
+    } else {
+      verdict = 'Healthy';
+      badgeClass = 'success';
+      borderClass = 'success';
+      summary = `${target} is on par with ${baseline}`;
+    }
+
+    const fmtDelta = (d) => d ? { ...d, deltaStr: deltaStr(d.delta) } : null;
+
+    return {
+      verdict, badgeClass, borderClass, summary,
+      hasHighlights: !!(worstRegression || bestImprovement),
+      topRegression: fmtDelta(worstRegression),
+      topImprovement: fmtDelta(bestImprovement),
+    };
+  },
+
+  // ─── Section 2: Canonical fingerprint ─────────────────────────
   hasFingerprint() {
-    const t = Template.instance();
-    const baseline = t.baselineTag.get();
-    const target = t.targetTag.get();
-    return baseline && target && Runs.find({ tag: { $in: [baseline, target] } }).count() > 0;
+    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
+    return bRuns.length > 0 && tRuns.length > 0;
   },
 
   fingerprint() {
-    const t = Template.instance();
-    const baseline = t.baselineTag.get();
-    const target = t.targetTag.get();
+    const { baseline, target, bRuns, tRuns } = getBaselineAndTarget(Template.instance());
 
-    // Aggregate across all scenarios for this tag
-    const bRuns = Runs.find({ tag: baseline }).fetch();
-    const tRuns = Runs.find({ tag: target }).fetch();
-    if (!bRuns.length || !tRuns.length) return [];
+    return FINGERPRINT_AXES.map(axis => {
+      const bRun = bRuns.filter(r => r.scenario === axis.scenario).sort((a, b) => b.timestamp - a.timestamp)[0];
+      const tRun = tRuns.filter(r => r.scenario === axis.scenario).sort((a, b) => b.timestamp - a.timestamp)[0];
+      const bVal = axis.extract(bRun);
+      const tVal = axis.extract(tRun);
+      if (tVal == null) return null;
 
-    const avg = (runs, extractor) => {
-      const vals = runs.map(extractor).filter(v => v != null);
-      return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-    };
-
-    const axes = [
-      {
-        label: 'Wall Clock',
-        bVal: avg(bRuns, r => r.wall_clock_ms / 1000),
-        tVal: avg(tRuns, r => r.wall_clock_ms / 1000),
-        unit: 's',
-      },
-      {
-        label: 'CPU',
-        bVal: avg(bRuns, r => r.metrics?.app_resources?.cpu?.avg),
-        tVal: avg(tRuns, r => r.metrics?.app_resources?.cpu?.avg),
-        unit: '%',
-      },
-      {
-        label: 'RAM',
-        bVal: avg(bRuns, r => r.metrics?.app_resources?.memory?.avg_mb),
-        tVal: avg(tRuns, r => r.metrics?.app_resources?.memory?.avg_mb),
-        unit: ' MB',
-      },
-      {
-        label: 'GC Pause',
-        bVal: avg(bRuns, r => r.metrics?.gc?.total_pause_ms),
-        tVal: avg(tRuns, r => r.metrics?.gc?.total_pause_ms),
-        unit: ' ms',
-      },
-      {
-        label: 'GC Max',
-        bVal: avg(bRuns, r => r.metrics?.gc?.max_pause_ms),
-        tVal: avg(tRuns, r => r.metrics?.gc?.max_pause_ms),
-        unit: ' ms',
-      },
-    ];
-
-    return axes.filter(a => a.tVal != null).map(a => {
-      const d = delta(a.bVal, a.tVal);
+      const d = pctDelta(bVal, tVal);
       return {
-        label: a.label,
-        value: fmt(a.tVal, a.unit, a.unit === ' MB' ? 0 : 1),
+        label: axis.label,
+        value: fmt(tVal, axis.unit, axis.unit === ' MB' ? 0 : 1),
         delta: d != null ? deltaStr(d) : '',
         deltaClass: d == null ? '' : Math.abs(d) < 5 ? 'text-muted' : d > 0 ? 'text-danger' : 'text-success',
+        source: (SCENARIO_META[axis.scenario]?.label || axis.scenario),
       };
-    });
+    }).filter(Boolean);
   },
 
-  families() {
-    const t = Template.instance();
-    const baseline = t.baselineTag.get();
-    const target = t.targetTag.get();
+  // ─── Section 3: Top changes ───────────────────────────────────
+  hasChanges() {
+    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
+    return bRuns.length > 0 && tRuns.length > 0;
+  },
 
-    // Get all scenarios that have data
+  improvements() {
+    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
+    return computeAllDeltas(bRuns, tRuns)
+      .filter(d => d.delta < 0)
+      .slice(0, 5)
+      .map(d => ({ ...d, deltaStr: deltaStr(d.delta) }));
+  },
+
+  regressions() {
+    const { bRuns, tRuns } = getBaselineAndTarget(Template.instance());
+    return computeAllDeltas(bRuns, tRuns)
+      .filter(d => d.delta > 0)
+      .slice(0, 5)
+      .map(d => ({ ...d, deltaStr: deltaStr(d.delta) }));
+  },
+
+  // ─── Section 4: Family tables ─────────────────────────────────
+  families() {
+    const { baseline, target } = getBaselineAndTarget(Template.instance());
     const allRuns = Runs.find({ tag: { $in: [baseline, target] } }).fetch();
     const scenarioNames = [...new Set(allRuns.map(r => r.scenario))];
     const groups = groupByFamily(scenarioNames);
@@ -190,7 +188,8 @@ Template.dashboard.helpers({
         const run = tRun || bRun;
         if (!run) return null;
 
-        const allForScenario = Runs.find({ tag: target, scenario }).count();
+        const targetRuns = Runs.find({ tag: target, scenario }).fetch();
+        const lastRun = targetRuns.sort((a, b) => b.timestamp - a.timestamp)[0];
 
         return {
           scenario,
@@ -201,48 +200,35 @@ Template.dashboard.helpers({
           ram: fmt(run.metrics?.app_resources?.memory?.avg_mb, ' MB', 0),
           gc: fmt(run.metrics?.gc?.total_pause_ms, ' ms', 0),
           verdict: verdictHtml(bRun, tRun),
-          runCount: allForScenario,
+          runCount: targetRuns.length,
+          lastRunDate: lastRun ? new Date(lastRun.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '',
         };
       }).filter(Boolean);
 
-      return {
-        ...family,
-        scenarioCount: family.scenarios.length,
-        isSingle: family.scenarios.length === 1,
-        rows,
-      };
+      return { ...family, scenarioCount: family.scenarios.length, isSingle: family.scenarios.length === 1, rows };
     });
   },
 
-  // Recent runs table (collapsed)
+  // ─── Recent runs (collapsed) ──────────────────────────────────
   recentRuns() { return Runs.find({}, { sort: { timestamp: -1 }, limit: 50 }); },
   totalRunCount() { return Runs.find().count(); },
-  formatDate(date) {
-    if (!date) return '-';
-    return new Date(date).toLocaleString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
+  formatDate(d) {
+    if (!d) return '-';
+    return new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   },
-  formatMs(ms) {
-    if (!ms) return '-';
-    return `${(ms / 1000).toFixed(1)}s`;
-  },
+  formatMs(ms) { return ms ? `${(ms / 1000).toFixed(1)}s` : '-'; },
   cpuAvg() { return this.metrics?.app_resources?.cpu?.avg?.toFixed(1) || '-'; },
   ramAvg() { return this.metrics?.app_resources?.memory?.avg_mb?.toFixed(0) || '-'; },
   gcPause() { return this.metrics?.gc?.total_pause_ms?.toFixed(0) || '-'; },
 });
 
 Template.dashboard.events({
-  'change #healthBaseline'(event, instance) {
-    instance.baselineTag.set(event.target.value);
-  },
-  'change #healthTarget'(event, instance) {
-    instance.targetTag.set(event.target.value);
-  },
-  'click #swapTags'(event, instance) {
-    const a = instance.baselineTag.get();
-    const b = instance.targetTag.get();
-    instance.baselineTag.set(b);
-    instance.targetTag.set(a);
+  'change #healthBaseline'(e, i) { i.baselineTag.set(e.target.value); },
+  'change #healthTarget'(e, i) { i.targetTag.set(e.target.value); },
+  'click #swapTags'(e, i) {
+    const a = i.baselineTag.get();
+    const b = i.targetTag.get();
+    i.baselineTag.set(b);
+    i.targetTag.set(a);
   },
 });
