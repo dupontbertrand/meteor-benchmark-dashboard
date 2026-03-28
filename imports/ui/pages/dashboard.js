@@ -100,7 +100,7 @@ Template.dashboard.onCreated(function () {
   this.subscribe('runs.recent', 200);
   this.tags = new ReactiveVar([]);
   this.selectedBranch = new ReactiveVar(FlowRouter.getQueryParam('branch') || 'devel');
-  this.referenceTag = new ReactiveVar('');
+  this.referenceTag = new ReactiveVar(FlowRouter.getQueryParam('ref') || '');
 
   Meteor.callAsync('runs.distinctTags').then((tags) => {
     this.tags.set(tags);
@@ -108,14 +108,16 @@ Template.dashboard.onCreated(function () {
     if (!tags.includes(branch) && tags.length > 0) {
       this.selectedBranch.set(tags[0]);
     }
-    this.referenceTag.set(detectReference(tags, this.selectedBranch.get()));
+    if (!this.referenceTag.get()) {
+      this.referenceTag.set(detectReference(tags, this.selectedBranch.get()));
+    }
   });
 
-  // Update reference when branch changes
+  // Update reference when branch changes (only if not manually set via URL)
   this.autorun(() => {
     const branch = this.selectedBranch.get();
     const tags = this.tags.get();
-    if (tags.length > 0) {
+    if (tags.length > 0 && !FlowRouter.getQueryParam('ref')) {
       this.referenceTag.set(detectReference(tags, branch));
     }
   });
@@ -130,6 +132,10 @@ Template.dashboard.helpers({
 
   isSelectedBranch(tag) {
     return tag === Template.instance().selectedBranch.get() ? 'selected' : null;
+  },
+
+  isSelectedRef(tag) {
+    return tag === Template.instance().referenceTag.get() ? 'selected' : null;
   },
 
   // ─── Verdict ────────────────────────────────────────────────
@@ -317,5 +323,9 @@ Template.dashboard.events({
   'change #branchSelect'(e, i) {
     i.selectedBranch.set(e.target.value);
     syncToUrl('branch', e.target.value);
+  },
+  'change #refSelect'(e, i) {
+    i.referenceTag.set(e.target.value);
+    syncToUrl('ref', e.target.value);
   },
 });

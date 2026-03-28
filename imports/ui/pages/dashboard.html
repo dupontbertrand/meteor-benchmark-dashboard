@@ -6,15 +6,25 @@
       <h2 class="mb-0">Branch Health</h2>
       <small class="text-muted">
         How is <strong>{{selectedBranch}}</strong> doing?
-        {{#if referenceTag}}<span class="ms-1">Reference: <strong>{{referenceTag}}</strong></span>{{/if}}
       </small>
     </div>
-    <div>
-      <select class="form-select form-select-sm" id="branchSelect" style="width: auto;">
-        {{#each tags}}
-          <option value="{{this}}" selected={{isSelectedBranch this}}>{{this}}</option>
-        {{/each}}
-      </select>
+    <div class="d-flex gap-2 align-items-end">
+      <div style="font-size: 0.75rem">
+        <div class="text-muted">branch</div>
+        <select class="form-select form-select-sm" id="branchSelect" style="width: auto;">
+          {{#each tags}}
+            <option value="{{this}}" selected={{isSelectedBranch this}}>{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div style="font-size: 0.75rem">
+        <div class="text-muted">reference</div>
+        <select class="form-select form-select-sm" id="refSelect" style="width: auto;">
+          {{#each tags}}
+            <option value="{{this}}" selected={{isSelectedRef this}}>{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
     </div>
   </div>
 
