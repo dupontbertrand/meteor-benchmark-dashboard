@@ -7,48 +7,48 @@
       <label class="form-label">Scenario</label>
       <select class="form-select form-select-sm" id="trendScenario">
         {{#each scenarios}}
-          <option value="{{this}}">{{this}}</option>
+          <option value="{{this}}" selected={{isSelected this "scenario"}}>{{this}}</option>
         {{/each}}
       </select>
     </div>
     <div class="col">
       <label class="form-label">Metric</label>
       <select class="form-select form-select-sm" id="trendMetric">
-        <option value="wall_clock">Wall Clock (s)</option>
-        <option value="cpu_avg">APP CPU avg (%)</option>
-        <option value="ram_avg">APP RAM avg (MB)</option>
-        <option value="gc_total">GC total pause (ms)</option>
-        <option value="gc_max">GC max pause (ms)</option>
-        <option value="gc_count">GC count</option>
+        <option value="wall_clock" selected={{isSelected "wall_clock" "metric"}}>Wall Clock (s)</option>
+        <option value="cpu_avg" selected={{isSelected "cpu_avg" "metric"}}>APP CPU avg (%)</option>
+        <option value="ram_avg" selected={{isSelected "ram_avg" "metric"}}>APP RAM avg (MB)</option>
+        <option value="gc_total" selected={{isSelected "gc_total" "metric"}}>GC total pause (ms)</option>
+        <option value="gc_max" selected={{isSelected "gc_max" "metric"}}>GC max pause (ms)</option>
+        <option value="gc_count" selected={{isSelected "gc_count" "metric"}}>GC count</option>
       </select>
     </div>
     <div class="col">
       <label class="form-label">Primary tag</label>
       <select class="form-select form-select-sm" id="trendTag">
         {{#each tags}}
-          <option value="{{this}}">{{this}}</option>
+          <option value="{{this}}" selected={{isSelected this "tag"}}>{{this}}</option>
         {{/each}}
       </select>
     </div>
     <div class="col">
       <label class="form-label">Compare with</label>
       <select class="form-select form-select-sm" id="trendCompareTag">
-        <option value="">None</option>
+        <option value="" selected={{isSelected "" "compare"}}>None</option>
         {{#each tags}}
-          <option value="{{this}}">{{this}}</option>
+          <option value="{{this}}" selected={{isSelected this "compare"}}>{{this}}</option>
         {{/each}}
       </select>
     </div>
     <div class="col">
       <label class="form-label">Range</label>
       <select class="form-select form-select-sm" id="trendRange">
-        <option value="10">Last 10 runs</option>
-        <option value="25">Last 25 runs</option>
-        <option value="50">Last 50 runs</option>
-        <option value="7d">Last 7 days</option>
-        <option value="30d">Last 30 days</option>
-        <option value="90d">Last 90 days</option>
-        <option value="all">All time</option>
+        <option value="10" selected={{isSelected "10" "range"}}>Last 10 runs</option>
+        <option value="25" selected={{isSelected "25" "range"}}>Last 25 runs</option>
+        <option value="50" selected={{isSelected "50" "range"}}>Last 50 runs</option>
+        <option value="7d" selected={{isSelected "7d" "range"}}>Last 7 days</option>
+        <option value="30d" selected={{isSelected "30d" "range"}}>Last 30 days</option>
+        <option value="90d" selected={{isSelected "90d" "range"}}>Last 90 days</option>
+        <option value="all" selected={{isSelected "all" "range"}}>All time</option>
       </select>
     </div>
   </div>

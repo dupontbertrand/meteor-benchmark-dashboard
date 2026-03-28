@@ -202,6 +202,18 @@ Template.trends.helpers({
   tags() { return Template.instance().tags.get(); },
   selectedTag() { return Template.instance().selectedTag.get(); },
 
+  isSelected(value, field) {
+    const t = Template.instance();
+    const map = {
+      scenario: t.selectedScenario,
+      metric: t.selectedMetric,
+      tag: t.selectedTag,
+      compare: t.compareTag,
+      range: t.selectedRange,
+    };
+    return map[field]?.get() === value ? 'selected' : null;
+  },
+
   hasData() {
     const t = Template.instance();
     const scenario = t.selectedScenario.get();
