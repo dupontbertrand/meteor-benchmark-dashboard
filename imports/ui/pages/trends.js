@@ -22,6 +22,27 @@ const METRIC_UNITS = {
 
 const COLORS = ['#0d6efd', '#dc3545', '#198754', '#ffc107', '#6610f2', '#fd7e14', '#20c997', '#e83e8c'];
 
+function applyRange(runs, range) {
+  if (!range || range === 'all') return runs;
+  // Date-based ranges
+  const dayMatch = range.match(/^(\d+)d$/);
+  if (dayMatch) {
+    const cutoff = new Date(Date.now() - parseInt(dayMatch[1]) * 86400000);
+    return runs.filter(r => new Date(r.timestamp) >= cutoff);
+  }
+  // Run-count based ranges
+  const n = parseInt(range);
+  if (!isNaN(n) && runs.length > n) return runs.slice(runs.length - n);
+  return runs;
+}
+
+function timeUnit(range) {
+  if (!range) return 'day';
+  if (range === '90d' || range === 'all') return 'week';
+  if (range === '30d') return 'day';
+  return 'hour';
+}
+
 function fmtVal(val, metric) {
   if (val == null) return '-';
   const unit = METRIC_UNITS[metric] || '';
@@ -54,6 +75,7 @@ Template.trends.onCreated(function () {
   this.selectedMetric = new ReactiveVar('gc_total');
   this.selectedTag = new ReactiveVar('');
   this.compareTag = new ReactiveVar('');
+  this.selectedRange = new ReactiveVar('25');
   this.chart = null;
 
   Meteor.callAsync('runs.distinctScenarios').then((s) => {
@@ -76,6 +98,7 @@ Template.trends.onRendered(function () {
     const metric = this.selectedMetric.get();
     const primaryTag = this.selectedTag.get();
     const compareTag = this.compareTag.get();
+    const range = this.selectedRange.get();
     if (!scenario || !primaryTag) return;
 
     const extractor = METRIC_EXTRACTORS[metric];
@@ -86,7 +109,8 @@ Template.trends.onRendered(function () {
     if (compareTag && compareTag !== primaryTag) tagsToShow.push(compareTag);
 
     const datasets = tagsToShow.map((tag, i) => {
-      const runs = Runs.find({ scenario, tag }, { sort: { timestamp: 1 } }).fetch();
+      const allRuns = Runs.find({ scenario, tag }, { sort: { timestamp: 1 } }).fetch();
+      const runs = applyRange(allRuns, range);
       const points = [];
       for (const run of runs) {
         const val = extractor(run);
@@ -120,7 +144,7 @@ Template.trends.onRendered(function () {
         scales: {
           x: {
             type: 'time',
-            time: { tooltipFormat: 'dd MMM yyyy, HH:mm' },
+            time: { unit: timeUnit(range), tooltipFormat: 'dd MMM yyyy, HH:mm' },
             title: { display: false },
           },
           y: { beginAtZero: true },
@@ -180,10 +204,12 @@ Template.trends.helpers({
     const scenario = t.selectedScenario.get();
     const tag = t.selectedTag.get();
     const metric = t.selectedMetric.get();
+    const range = t.selectedRange.get();
     const extractor = METRIC_EXTRACTORS[metric];
     if (!scenario || !tag || !extractor) return null;
 
-    const runs = Runs.find({ scenario, tag }, { sort: { timestamp: 1 } }).fetch();
+    const allRuns = Runs.find({ scenario, tag }, { sort: { timestamp: 1 } }).fetch();
+    const runs = applyRange(allRuns, range);
     const values = runs.map(extractor).filter(v => v != null);
     const lastRun = runs[runs.length - 1];
 
@@ -243,4 +269,5 @@ Template.trends.events({
   'change #trendMetric'(e, i) { i.selectedMetric.set(e.target.value); },
   'change #trendTag'(e, i) { i.selectedTag.set(e.target.value); },
   'change #trendCompareTag'(e, i) { i.compareTag.set(e.target.value); },
+  'change #trendRange'(e, i) { i.selectedRange.set(e.target.value); },
 });

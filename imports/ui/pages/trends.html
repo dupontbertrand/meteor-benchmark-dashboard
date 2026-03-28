@@ -3,7 +3,7 @@
 
   <!-- Filters -->
   <div class="row mb-3">
-    <div class="col-md-3">
+    <div class="col">
       <label class="form-label">Scenario</label>
       <select class="form-select form-select-sm" id="trendScenario">
         {{#each scenarios}}
@@ -11,7 +11,7 @@
         {{/each}}
       </select>
     </div>
-    <div class="col-md-3">
+    <div class="col">
       <label class="form-label">Metric</label>
       <select class="form-select form-select-sm" id="trendMetric">
         <option value="wall_clock">Wall Clock (s)</option>
@@ -22,7 +22,7 @@
         <option value="gc_count">GC count</option>
       </select>
     </div>
-    <div class="col-md-3">
+    <div class="col">
       <label class="form-label">Primary tag</label>
       <select class="form-select form-select-sm" id="trendTag">
         {{#each tags}}
@@ -30,13 +30,25 @@
         {{/each}}
       </select>
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Compare with (optional)</label>
+    <div class="col">
+      <label class="form-label">Compare with</label>
       <select class="form-select form-select-sm" id="trendCompareTag">
         <option value="">None</option>
         {{#each tags}}
           <option value="{{this}}">{{this}}</option>
         {{/each}}
+      </select>
+    </div>
+    <div class="col">
+      <label class="form-label">Range</label>
+      <select class="form-select form-select-sm" id="trendRange">
+        <option value="10">Last 10 runs</option>
+        <option value="25">Last 25 runs</option>
+        <option value="50">Last 50 runs</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="90d">Last 90 days</option>
+        <option value="all">All time</option>
       </select>
     </div>
   </div>
